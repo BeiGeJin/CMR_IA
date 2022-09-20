@@ -7,15 +7,15 @@
 
 FILES:
 
-Setup files and the core CMR2 code can be found in the top-level directory.
+Setup files and the core CMR-IA code can be found in the top-level directory.
 These include the following:
-1) CMR2_pack_cyth.pyx - Contains the Cython implementation of CMR2.
-2) setup_cmr2.py - A script which can be used to build and install CMR2_pack_cyth.
+1) CMR_IA.pyx - Contains the Cython implementation of CMR_IA.
+2) setup_cmr2.py - A script which can be used to build and install CMR_IA.
 3) setup_env.sh - A script which can be used to create a new Python 3 environment
-	able to run CMR2.
+	able to run CMR_IA.
 
 Code for fitting CMR2 can be found in the fitting/ subdirectory:
-4) fitting/pso_cmr2_ltpFR3.py - Contains a Python function for running particle
+4) fitting/pso_cmr2.py - Contains a Python function for running particle
 	swarm optimization on CMR2.
 5) fitting/optimization_utils.py - Contains a variety of utility functions used by the
 	optimization algorithms, including the function that evaluates each parameter
