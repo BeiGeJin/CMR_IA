@@ -9,14 +9,15 @@ FILES:
 
 Setup files and the core CMR-IA code can be found in the top-level directory.
 These include the following:
-1) CMR_IA.pyx - Contains the Cython implementation of CMR_IA.
-2) setup_cmr2.py - A script which can be used to build and install CMR_IA.
+1) CMR_IA.pyx - Contains the Cython implementation of CMR-IA.
+2) setup_cmr2.py - A script which can be used to build and install CMR-IA.
 3) setup_env.sh - A script which can be used to create a new Python 3 environment
-	able to run CMR_IA.
+	able to run CMR-IA.
 
-Code for fitting CMR2 can be found in the fitting/ subdirectory:
+Code for fitting CMR-IA can be found in the fitting/ subdirectory:
 4) fitting/pso_cmr2.py - Contains a Python function for running particle
-	swarm optimization on CMR2.
+	swarm optimization on CMR2. Includes implementations of many different
+	particle swarm variants (see its docstring for reference).
 5) fitting/optimization_utils.py - Contains a variety of utility functions used by the
 	optimization algorithms, including the function that evaluates each parameter
 	set by calling CMR2 and comparing its simulated behavior to the target
@@ -39,7 +40,7 @@ files in the wordpools/ subdirectory:
 SETUP:
 
 1A) If you do not already have a Python 3 environment set up, use the provided
-shell script to set up an environment, build and install CMR2 and its required
+shell script to set up an environment, build and install CMR-IA and its required
 packages, and set up a Jupyter kernel for the environment:
 
 bash setup_env.sh
@@ -57,7 +58,7 @@ python setup_cmr2.py install
 2) Regardless of which of the two methods you used to install CMR, you should
 now be able to import it into Python from anywhere using the following line:
 
-import CMR2_pack_cyth as cmr
+import CMR_IA as cmr
 
 Once you have imported it, you can use the functions from the package just
 like you would use any other package in Python. Note that the supplementary
@@ -67,7 +68,7 @@ modify them as needed to work with your research project, and then run the
 files directly (see below).
 
 
-3) Any time you change or update CMR2_pack_cyth, you will need to rerun the
+3) Any time you change or update CMR_IA, you will need to rerun the
 following line in order to rebuild the code and update your installation:
 
 python setup_cmr2.py install 
@@ -75,7 +76,7 @@ python setup_cmr2.py install
 
 4) If you wish to use the model fitting algorithms, you will also need to set
 up a couple scripts that will help you test multiple models in parallel. These
-files are located in the pyCMR2/pgo_files/ directory, not in pyCMR2/CMR2_Optimized.
+files are located in the Modeling/CMR2/pgo_files/ directory.
 If you do not already have a bin folder in your home directory, create one:
 
 mkdir ~/bin
@@ -92,11 +93,14 @@ You should now be able to call the pgo function in your terminal from anywhere.
 See the instructions below on how to use pgo in conjunction with the model
 fitting algorithms to optimize your model fits.
 
+[Beige]: Another Way is to cd to Modeling/CMR2/fitting and type ./pgo to call pgo function directly.
+
 -------------------------------------------------------------------------------
+[Most Beige's modifications on previous CMR2 are illustrated in this section.]
 
 RUNNING CMR2:
 
-Once you have imported CMR2_pack_cyth, there are three ways you can run
+Once you have imported CMR_IA, there are three ways you can run
 simulations with CMR. The first is through the run_cmr2_single_sess() function,
 which allows you to simulate a single session using a given parameter set. The
 second is through the run_cmr2_multi_sess() function, which allows you to
@@ -176,8 +180,7 @@ In order to fit CMR2 to a set of data, you will need to use some type of
 optimization algorithm to search the paramaeter space and evaluate the goodness
 of fit of different parameter sets. Although you can choose to use any
 algorithm you like, included is a particle swarm algorithm that has been used in
-previous work. It can be found in the fitting/ subdirectory. As the name of
-the file implies, the provided code was specialized for fitting ltpFR3. In order
+previous work. It can be found in the fitting/ subdirectory. In order
 to make use of these functions, you will need to make copies of them and
 customize them for your purposes. You can find additional code in
 optimization_utils.py to help you design your actual goodness-of-fit test,
@@ -198,14 +201,12 @@ progress to make sure the next iteration starts once all jobs have finished
 evaluating the current iteration. You therefore only need to run pgo once, 
 rather than once per iteration.
 
-IMPORTANT: The particl swarm leaves behind many files tracking intermediate steps
+IMPORTANT: The particle swarm leaves behind many files tracking intermediate steps
 of the algorithm. Once the algorithm has finished, remember to delete all
 tempfiles and keep only the files with the goodness of fit scores and parameter
 values from each iteration.
 
-1) pso_cmr2_ltpFR3.py: A particle swarm optimization algorithm. Includes
-implementations of many different particle swarm variants (see its docstring
-for reference). Particle swarms are designed to test small numbers of parameter
+Note: Particle swarms are designed to test small numbers of parameter
 sets for hundreds/thousands of iterations. Parameter sets within an iteration
 can be tested in parallel. Each new iteration cannot start until all parameter
 sets from the current iteration have finished.

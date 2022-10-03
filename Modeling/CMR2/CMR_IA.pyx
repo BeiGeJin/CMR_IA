@@ -78,10 +78,10 @@ class CMR2(object):
                  source_mat=None, rec_mat=None, ffr_mat=None, cue_mat=None, task='FR', mode='IFR'):
         """
         Initializes a CMR2 object and prepares it to simulate the session defined
-        by pres_mat.
+        by pres_mat. [Modified by Beige]
 
         :param params: A dictionary of model parameters and settings to use for the
-            simulation. Call the CMR2_pack_cyth.make_params() function to get a
+            simulation. Call the CMR_IA.make_params() function to get a
             dictionary template you can fill in with your desired values.
         :param pres_mat: A 2D array specifying the ID numbers of the words that will be
             presented to the model on each trial. Row i, column j should hold the ID number
@@ -109,8 +109,11 @@ class CMR2(object):
             to the model in recognition. Used in simulating recognition. (DEFAULT=None)
         :param task: A string indicating the type of task to simulate. Set to 'FR' for free
             recall or 'CR' for cued recall or 'Recog' for recognition. (DEFUALT='FR')
-        :param mode: A string indicating the type of task mode to simulate. Set to 'IFR'
-            for immediate free recall or 'DFR' for delayed recall. (DEFUALT='IFR')
+        :param mode: A string indicating the type of task mode to simulate. For task = 'FR',
+            set to 'IFR' for immediate free recall or 'DFR' for delayed recall; for task = 'CR',
+            set to 'Simultaneous' for simultaneous encoding or 'Sequential' for sequential encoding;
+            for task = 'Recog', set to 'Continuous' for continuous recognition or 'Final' for a
+            recognition in final stage. (DEFUALT='IFR')
         """
         ##########
         #
@@ -125,25 +128,26 @@ class CMR2(object):
         self.sem_mat = np.array(sem_mat, dtype=np.float32)  # Semantic similarity matrix (e.g. Word2vec, LSA, WAS)
         self.extra_distract = 0
 
-        ### bj edited ###
-        if cue_mat is None: # input cue mat
+        ### [Beige edited begin]
+        # input cue mat
+        if cue_mat is None:
             self.have_cue = False
         else:
             self.have_cue = True
             self.cues_nos = np.array(cue_mat, dtype=np.int16)
-
-        if rec_mat is None: # input recall mat
+        # input recall mat
+        if rec_mat is None:
             self.have_rec = False
         else:
             self.have_rec = True
             self.rec_nos = np.array(rec_mat, dtype=np.int16)
-
-        if ffr_mat is None: # input ffr mat
+        # input ffr mat
+        if ffr_mat is None:
             self.have_ffr = False
         else:
             self.have_ffr = True
             self.ffr_nos = np.array(ffr_mat, dtype=np.int16)
-
+        # input source
         if source_mat is None:
             self.nsources = 0
         else:
@@ -151,16 +155,17 @@ class CMR2(object):
             self.nsources = self.sources.shape[2]
             if self.sources.shape[0:2] != self.pres_nos.shape[0:2]:
                 raise ValueError('Source matrix must have the same number of rows and columns as the presented item matrix.')
-
-        if task not in ('FR', 'CR','Recog'): # raise error for task parameter
+        # input task
+        if task not in ('FR', 'CR','Recog'): # Task must in FR or CR or Recog
             raise ValueError('Task must be "FR" or "CR" or "Recog", not %s.' % task)
         if (task is 'CR' or task is 'Recog') and cue_mat is None:
             raise ValueError('%s task must has a cue matrix.' % task)
-        self.task = task  # Task type -> FR or CR or Recog
-
+        self.task = task
+        # input mode
         if mode not in ('IFR', 'DFR','Simultaneous','Sequential','Continuous','Final'):
             raise ValueError('Mode must be "IFR" or "DFR", not %s.' % mode)
-        self.mode = mode  # Recall type -> IFR or DFR
+        self.mode = mode
+        # input learn_while_retrieving
         self.learn_while_retrieving = self.params['learn_while_retrieving'] if 'learn_while_retrieving' in self.params else False
 
         # Determine the number of lists and the maximum list length (how many words or word-pairs)
@@ -205,7 +210,7 @@ class CMR2(object):
             self.ffr_indexes = np.searchsorted(self.all_nos_unique, self.ffr_nos)
         if self.have_cue:
             self.cues_indexes = np.searchsorted(self.all_nos_unique, self.cues_nos)
-        ### bj edited ###
+        ### [Beige edited end]
 
         # Cut down semantic matrix to contain only the items in the session
         self.sem_mat = self.sem_mat[self.all_nos_unique - 1, :][:, self.all_nos_unique - 1]
@@ -324,6 +329,7 @@ class CMR2(object):
         2) A sequence of item presentations
         3) A pre-recall distractor (only if the mode was set to 'DFR')
         4) A recall period
+        [Unchanged from CMR2]
         """
         ##########
         #
@@ -334,22 +340,16 @@ class CMR2(object):
         # On first trial, present orthogonal item that starts the system;
         # On subsequent trials, present an interlist distractor item
         # Assume source context changes at same rate as temporal between trials
-        # [bj] initialize context vector to have non-zero elements, no updating matrix
-        # print("Pretrial Start!") #
+        # initialize context vector to have non-zero elements, no updating matrix
         self.phase = 'pretrial'
         self.serial_position = 0
-        self.beta = 1 if self.trial_idx == 0 else self.params['beta_rec_post'] # jbg: learn pre-trial distractor
+        self.beta = 1 if self.trial_idx == 0 else self.params['beta_rec_post'] # learn pre-trial distractor
         self.beta_source = 1 if self.trial_idx == 0 else self.params['beta_rec_post']
         # Treat initial source and intertrial source as an even mixture of all sources
         #source = np.zeros(self.nsources) if self.nsources > 0 else None
         source = self.sources[self.trial_idx, self.serial_position] if self.nsources > 0 else None
         self.present_item(self.distractor_idx, source, update_context=True, update_weights=False)
         self.distractor_idx += 1
-        # print("pre f:\n", self.f)  #
-        # print("pre c:\n", self.c)  #
-        # print("pre M_FC:\n",self.M_FC)  #
-        # print("pre M_CF:\n",self.M_CF)  #
-        # print("Pretrial End!") #
 
         ##########
         #
@@ -357,7 +357,6 @@ class CMR2(object):
         #
         ##########
 
-        # print("Encoding Start!")  #
         self.phase = 'encoding'
         for self.serial_position in range(self.pres_indexes.shape[1]):
             # Skip over any zero-padding in the presentation matrix in order to allow variable list length
@@ -368,13 +367,6 @@ class CMR2(object):
             self.beta = self.params['beta_enc']
             self.beta_source = self.params['beta_source'] if self.nsources > 0 else 0
             self.present_item(pres_idx, source, update_context=True, update_weights=True)
-            # print("encoding",self.serial_position,"item index:\n", pres_idx)  #
-            # print("encoding",self.serial_position,"f:\n", self.f)  #
-            # print("encoding",self.serial_position,"c:\n", self.c)  #
-            # print("encoding",self.serial_position,"M_FC:\n",self.M_FC) #
-            # print("encoding",self.serial_position,"phi:\n",self.prim_vec[self.serial_position]) #
-            # print("encoding",self.serial_position,"M_CF:\n",self.M_CF) #
-        # print("Encoding End!")  #
 
         ##########
         #
@@ -400,7 +392,6 @@ class CMR2(object):
         #
         ##########
 
-        # print("Recall Start!")  #
         self.phase = 'recall'
         self.beta = self.params['beta_rec']
         # Follow Polyn et al. (2009) assumption that beta_source is the same at encoding and retrieval
@@ -413,19 +404,96 @@ class CMR2(object):
                 self.simulate_recall(time_limit=self.params['rec_time_limit'], max_recalls=self.params['max_recalls'])
             else:
                 self.simulate_recall(time_limit=self.params['rec_time_limit'])
-        elif self.task == 'CR': #
-            for self.cue_idx in range(self.cues_nos.shape[1]):
-                # print("Cue Index:\n", self.cues_indexes[self.trial_idx,self.cue_idx])  #
-                self.cued_recall(self.cue_idx,time_limit=self.params['rec_time_limit'])
-        elif self.task == 'Recog': #
-            for self.cue_idx in range(self.cues_nos.shape[1]):
-                # print("Cue Index:\n", self.cues_indexes[self.trial_idx,self.cue_idx])  #
-                self.simulate_recog(self.cue_idx)
 
         self.trial_idx += 1
-        # print("Recall End!")  #
 
-    def run_recog_single_sess(self):
+    def run_cr_trial(self):
+        """
+        Simulates a standard trial of cued recall, consisting of the following steps:
+        1) A pre-trial context shift
+        2) A sequence of item (word pair) presentations
+        3) A recall period
+        [Newly added by Beige]
+        """
+        ##########
+        #
+        # Shift context before start of new list
+        #
+        ##########
+
+        # On first trial, present orthogonal item that starts the system;
+        # On subsequent trials, present an interlist distractor item
+        # Assume source context changes at same rate as temporal between trials
+        # initialize context vector to have non-zero elements, no updating matrix
+        # print("Pretrial Start!")
+        self.phase = 'pretrial'
+        self.serial_position = 0
+        self.beta = 1 if self.trial_idx == 0 else self.params['beta_rec_post'] # learn pre-trial distractor
+        self.beta_source = 1 if self.trial_idx == 0 else self.params['beta_rec_post']
+        # Treat initial source and intertrial source as an even mixture of all sources
+        #source = np.zeros(self.nsources) if self.nsources > 0 else None
+        source = self.sources[self.trial_idx, self.serial_position] if self.nsources > 0 else None
+        self.present_item(self.distractor_idx, source, update_context=True, update_weights=False)
+        self.distractor_idx += 1
+        # print("pre f:\n", self.f)
+        # print("pre c:\n", self.c)
+        # print("pre M_FC:\n",self.M_FC)
+        # print("pre M_CF:\n",self.M_CF)
+        # print("Pretrial End!")
+
+        ##########
+        #
+        # Present items
+        #
+        ##########
+
+        # print("Encoding Start!")
+        self.phase = 'encoding'
+        for self.serial_position in range(self.pres_indexes.shape[1]):
+            # Skip over any zero-padding in the presentation matrix in order to allow variable list length
+            if not self.pres_nonzero_mask[self.trial_idx, self.serial_position].all:
+                continue
+            pres_idx = self.pres_indexes[self.trial_idx, self.serial_position] # [bj] if word-pair, give a pair
+            source = self.sources[self.trial_idx, self.serial_position] if self.nsources > 0 else None
+            self.beta = self.params['beta_enc']
+            self.beta_source = self.params['beta_source'] if self.nsources > 0 else 0
+
+            if self.mode == 'Simultaneous':
+                self.present_item(pres_idx, source, update_context=True, update_weights=True)
+            elif self.mode == 'Sequential':
+                self.present_item(pres_idx[0], source, update_context=False, update_weights=True)
+                # between encoding 2 items could be a potential context drift
+                self.present_item(pres_idx[1], source, update_context=False, update_weights=True)
+                # then update the context all at a time
+                self.present_item(pres_idx, source, update_context=True, update_weights=False)
+            # print("encoding",self.serial_position,"item index:\n", pres_idx)
+            # print("encoding",self.serial_position,"f:\n", self.f)
+            # print("encoding",self.serial_position,"c:\n", self.c)
+            # print("encoding",self.serial_position,"M_FC:\n",self.M_FC)
+            # print("encoding",self.serial_position,"M_CF:\n",self.M_CF)
+        # print("Encoding End!")
+
+        ##########
+        #
+        # Recall period
+        #
+        ##########
+
+        # print("Recall Start!")
+        self.phase = 'recall'
+        self.beta = self.params['beta_rec']
+        # Follow Polyn et al. (2009) assumption that beta_source is the same at encoding and retrieval
+        self.beta_source = self.params['beta_source'] if self.nsources > 0 else 0
+        self.rec_items.append([])
+        self.rec_times.append([])
+        for self.cue_idx in range(self.cues_nos.shape[1]):
+            # print("Cue Index:\n", self.cues_indexes[self.trial_idx,self.cue_idx])
+            self.simulate_cr(self.cue_idx,time_limit=self.params['rec_time_limit'])
+
+        self.trial_idx += 1
+        # print("Recall End!")
+
+    def run_peers_recog_single_sess(self):
         """
         Simulates a session of PEERS1&3 recognition, consisting of the following steps:
         1) Pre-trial context initialization / between-trial distractor
@@ -435,15 +503,9 @@ class CMR2(object):
         5) Item presentation as actural final free recall (If have one)
         6) Pre-recog distractor
         7) Recognition simulation
+        [Newly added by Beige]
         """
-
-        # print("pre f:\n", self.f)  #
-        # print("pre c:\n", self.c)  #
-        # print("pre M_FC:\n",self.M_FC)  #
-        # print("pre M_CF:\n",self.M_CF)  #
-
         for self.trial_idx in range(self.nlists):
-
             ##########
             #
             # Shift context before start of new list
@@ -454,7 +516,7 @@ class CMR2(object):
             # On subsequent trials, present an interlist distractor item
             # Assume source context changes at same rate as temporal between trials
             # [bj] initialize context vector to have non-zero elements, no updating matrix
-            # print("Pretrial Start!") #
+            # print("Pretrial Start!")
             self.phase = 'pretrial'
             self.serial_position = 0
             self.beta = 1 if self.trial_idx == 0 else self.params['beta_rec_post'] # jbg: learn pre-trial distractor
@@ -464,9 +526,9 @@ class CMR2(object):
             source = self.sources[self.trial_idx, self.serial_position] if self.nsources > 0 else None
             self.present_item(self.distractor_idx, source, update_context=True, update_weights=False)
             self.distractor_idx += 1
-            # print("pre M_FC:\n",self.M_FC)  #
-            # print("pre M_CF:\n",self.M_CF)  #
-            # print("Pretrial End!") #
+            # print("pre M_FC:\n",self.M_FC)
+            # print("pre M_CF:\n",self.M_CF)
+            # print("Pretrial End!")
 
             ##########
             #
@@ -486,28 +548,10 @@ class CMR2(object):
                 self.beta_source = self.params['beta_source'] if self.nsources > 0 else 0
                 # print("encoding",self.serial_position,"item index:\n", pres_idx)  #
                 self.present_item(pres_idx, source, update_context=True, update_weights=True)
-                # print("encoding",self.serial_position,"M_FC:\n",self.M_FC) #
-                # print("encoding",self.serial_position,"phi:\n",self.prim_vec[self.serial_position]) #
-                # print("encoding",self.serial_position,"M_CF:\n",self.M_CF) #
-            # print("Encoding End!")  #
-
-            ##########
-            #
-            # Pre-recall distractor (if delayed free recall)
-            #
-            ##########
-
-            # if self.mode == 'DFR':
-            #     self.phase = 'distractor'
-            #     self.beta = self.params['beta_distract']
-            #     # Assume source context changes at the same rate as temporal during distractors
-            #     self.beta_source = self.params['beta_distract']
-            #     # By default, treat distractor source as an even mixture of all sources
-            #     # [If your distractors and sources are related, you should modify this so that you can specify distractor source.]
-            #     #source = np.zeros(self.nsources) if self.nsources > 0 else None
-            #     source = self.sources[self.trial_idx, self.serial_position] if self.nsources > 0 else None
-            #     self.present_item(self.distractor_idx, source, update_context=True, update_weights=False)
-            #     self.distractor_idx += 1
+                # print("encoding",self.serial_position,"M_FC:\n",self.M_FC)
+                # print("encoding",self.serial_position,"phi:\n",self.prim_vec[self.serial_position])
+                # print("encoding",self.serial_position,"M_CF:\n",self.M_CF)
+            # print("Encoding End!")
 
             ##########
             #
@@ -517,7 +561,6 @@ class CMR2(object):
 
             # print("Recall Start!")
             if self.have_rec:
-
                 self.phase = 'recall'
                 for self.rec_position in range(self.rec_indexes.shape[1]):
                     # Skip over any zero-padding in the presentation matrix in order to allow variable list length
@@ -527,12 +570,9 @@ class CMR2(object):
                     self.beta = self.params['beta_rec']
                     self.beta_source = 0
                     self.present_item(rec_idx, source=None, update_context=True, update_weights=False)
-
-            # print("Recall", "M_FC:\n", self.M_FC)  #
-            # print("Recall", "M_CF:\n", self.M_CF)  #
-            #
-            # print("Recall End!")  #
-
+            # print("Recall", "M_FC:\n", self.M_FC)
+            # print("Recall", "M_CF:\n", self.M_CF)
+            # print("Recall End!")
 
         ##########
         #
@@ -541,9 +581,8 @@ class CMR2(object):
         ##########
 
         if self.have_ffr:
-
             # shift the context before the final free recall
-            # print("Pre FFR Start!")  #
+            # print("Pre FFR Start!")
             self.phase = 'shift'
             self.serial_position = 0
             self.beta = self.params['beta_rec_post']
@@ -551,23 +590,23 @@ class CMR2(object):
             source = None
             self.present_item(self.distractor_idx, source, update_context=True, update_weights=False)
             self.distractor_idx += 1
-            # print("Pre FFR End!")  #
+            # print("Pre FFR End!")
 
             # update the context as if we do the actual final free recall
-            # print("FFR Start!") #
+            # print("FFR Start!")
             self.phase = 'FFR'
             for self.ffr_position in range(len(self.ffr_indexes)):
                 # Skip over any zero-padding in the presentation matrix in order to allow variable list length
                 if not self.ffr_nonzero_mask[self.ffr_position].all:
                     continue
                 ffr_idx = self.ffr_indexes[self.ffr_position] # [bj] if word-pair, give a pair
-                # print("FFR Index:\n", ffr_idx)  #
+                # print("FFR Index:\n", ffr_idx)
                 self.beta = self.params['beta_rec']
                 self.beta_source = 0
                 self.present_item(ffr_idx, source=None, update_context=True, update_weights=False)
-            # print("ffr M_FC:\n", self.M_FC)  #
-            # print("ffr M_CF:\n", self.M_CF)  #
-            # print("FFR End!") #
+            # print("ffr M_FC:\n", self.M_FC)
+            # print("ffr M_CF:\n", self.M_CF)
+            # print("FFR End!")
 
         ###########
         #
@@ -576,7 +615,7 @@ class CMR2(object):
         ##########
 
         # shift the context before the recognition
-        # print("Pre Recog Start!")  #
+        # print("Pre Recog Start!")
         self.phase = 'shift'
         self.serial_position = 0
         self.beta = self.params['beta_rec_post']
@@ -584,25 +623,22 @@ class CMR2(object):
         source = None
         self.present_item(self.distractor_idx, source, update_context=True, update_weights=False)
         self.distractor_idx += 1
-        # print("pre recog M_FC:\n", self.M_FC)  #
-        # print("pre recog M_CF:\n", self.M_CF)  #
-        # print("Pre Recog End!")  #
+        # print("pre recog M_FC:\n", self.M_FC)
+        # print("pre recog M_CF:\n", self.M_CF)
+        # print("Pre Recog End!")
 
         # Finally, run the recognition!
-        # print("Recog Start!") #
+        # print("Recog Start!")
         self.phase = 'recognition'
         self.beta = self.params['beta_rec']
         self.beta_source = self.params['beta_source'] if self.nsources > 0 else 0
         for self.cue_position in range(len(self.cues_indexes)):
             cue_idx = self.cues_indexes[self.cue_position]
-            # print("Cue Index:\n", cue_idx)  #
+            # print("Cue Index:\n", cue_idx)
             self.simulate_recog(cue_idx)
-        # print("Recog End!")  #
+        # print("Recog End!")
 
-        # resp_dict = {self.cues_nos[i]:self.rec_items[i] for i in range(len(self.cues_nos))}
-        # return resp_dict
-
-    def run_continuous_recog_single_sess(self):
+    def run_conti_recog_single_sess(self):
         """
         Simulates a session of continuous recognition, consisting of the following steps:
         1) Pre-session context initialization / between-trial distractor
@@ -610,15 +646,9 @@ class CMR2(object):
         3) Item presentation as encoding
         4) Loop step 1-3
         9.12 update: beta_enc for new judgement and beta_rec for old judgement
+        [Newly added by Beige]
         """
-
-        # timing in present_item()
-        # self.time1 = 0
-        # self.time2 = 0
-        # self.time3 = 0
-
         for trial_idx in range(self.nlists):
-
             ##########
             #
             # Shift context before each trial
@@ -629,7 +659,6 @@ class CMR2(object):
             # On subsequent trials, present an interlist distractor item
             # Assume source context changes at same rate as temporal between trials
             # initialize context vector to have non-zero elements, no updating matrix
-
             # print("Pretrial Start!") #
             self.phase = 'pretrial'
             self.serial_position = 0
@@ -677,117 +706,12 @@ class CMR2(object):
             # print("encoding M_FC:\n",self.M_FC) #
             # print("Encoding End!")  #
 
-    def run_cr_trial(self):
-        """
-        Simulates a standard trial of cued recall, consisting of the following steps:
-        1) A pre-trial context shift
-        2) A sequence of item(word pair) presentations
-        3) A pre-recall distractor (only if the mode was set to 'DFR')
-        4) A recall period
-        """
-        ##########
-        #
-        # Shift context before start of new list
-        #
-        ##########
-
-        # On first trial, present orthogonal item that starts the system;
-        # On subsequent trials, present an interlist distractor item
-        # Assume source context changes at same rate as temporal between trials
-        # [bj] initialize context vector to have non-zero elements, no updating matrix
-        # print("Pretrial Start!") #
-        self.phase = 'pretrial'
-        self.serial_position = 0
-        self.beta = 1 if self.trial_idx == 0 else self.params['beta_rec_post'] # jbg: learn pre-trial distractor
-        self.beta_source = 1 if self.trial_idx == 0 else self.params['beta_rec_post']
-        # Treat initial source and intertrial source as an even mixture of all sources
-        #source = np.zeros(self.nsources) if self.nsources > 0 else None
-        source = self.sources[self.trial_idx, self.serial_position] if self.nsources > 0 else None
-        self.present_item(self.distractor_idx, source, update_context=True, update_weights=False)
-        self.distractor_idx += 1
-        # print("pre f:\n", self.f)  #
-        # print("pre c:\n", self.c)  #
-        # print("pre M_FC:\n",self.M_FC)  #
-        # print("pre M_CF:\n",self.M_CF)  #
-        # print("Pretrial End!") #
-
-        ##########
-        #
-        # Present items
-        #
-        ##########
-
-        # print("Encoding Start!")  #
-        self.phase = 'encoding'
-        for self.serial_position in range(self.pres_indexes.shape[1]):
-            # Skip over any zero-padding in the presentation matrix in order to allow variable list length
-            if not self.pres_nonzero_mask[self.trial_idx, self.serial_position].all:
-                continue
-            pres_idx = self.pres_indexes[self.trial_idx, self.serial_position] # [bj] if word-pair, give a pair
-            source = self.sources[self.trial_idx, self.serial_position] if self.nsources > 0 else None
-            self.beta = self.params['beta_enc']
-            self.beta_source = self.params['beta_source'] if self.nsources > 0 else 0
-
-            if self.mode == 'Simultaneous':
-                self.present_item(pres_idx, source, update_context=True, update_weights=True)
-            elif self.mode == 'Sequential':
-                self.present_item(pres_idx[0], source, update_context=False, update_weights=True)
-                # between encoding 2 items could be a potential context drift
-                self.present_item(pres_idx[1], source, update_context=False, update_weights=True)
-                # then update the context all at a time
-                self.present_item(pres_idx, source, update_context=True, update_weights=False)
-            # print("encoding",self.serial_position,"item index:\n", pres_idx)  #
-            # print("encoding",self.serial_position,"f:\n", self.f)  #
-            # print("encoding",self.serial_position,"c:\n", self.c)  #
-            # print("encoding",self.serial_position,"M_FC:\n",self.M_FC) #
-            # print("encoding",self.serial_position,"phi:\n",self.prim_vec[self.serial_position]) #
-            # print("encoding",self.serial_position,"M_CF:\n",self.M_CF) #
-        # print("Encoding End!")  #
-
-        ##########
-        #
-        # Pre-recall distractor (if delayed free recall)
-        #
-        ##########
-
-        if self.mode == 'DFR':
-            self.phase = 'distractor'
-            self.beta = self.params['beta_distract']
-            # Assume source context changes at the same rate as temporal during distractors
-            self.beta_source = self.params['beta_distract']
-            # By default, treat distractor source as an even mixture of all sources
-            # [If your distractors and sources are related, you should modify this so that you can specify distractor source.]
-            #source = np.zeros(self.nsources) if self.nsources > 0 else None
-            source = self.sources[self.trial_idx, self.serial_position] if self.nsources > 0 else None
-            self.present_item(self.distractor_idx, source, update_context=True, update_weights=False)
-            self.distractor_idx += 1
-
-        ##########
-        #
-        # Recall period
-        #
-        ##########
-
-        # print("Recall Start!")  #
-        self.phase = 'recall'
-        self.beta = self.params['beta_rec']
-        # Follow Polyn et al. (2009) assumption that beta_source is the same at encoding and retrieval
-        self.beta_source = self.params['beta_source'] if self.nsources > 0 else 0
-        self.rec_items.append([])
-        self.rec_times.append([])
-        for self.cue_idx in range(self.cues_nos.shape[1]):
-            # print("Cue Index:\n", self.cues_indexes[self.trial_idx,self.cue_idx])  #
-            self.cued_recall(self.cue_idx,time_limit=self.params['rec_time_limit'])
-
-        self.trial_idx += 1
-        # print("Recall End!")  #
-
 
     def present_item(self, item_idx, source=None, update_context=True, update_weights=True):
         """
         Presents a single item (or distractor) to the model by updating the
         feature vector. Also provides options to update context and the model's
-        associative matrices after presentation.
+        associative matrices after presentation. [Modified by Beige]
 
         :param item_idx: The index of the cell within the feature vector that
             should be activated by the presented item. If None, presents an
@@ -809,7 +733,6 @@ class CMR2(object):
         #
         ##########
 
-        # t = time.time()
         # Activate the presented item itself
         self.f.fill(0)
         if item_idx is not None:
@@ -819,8 +742,8 @@ class CMR2(object):
         if self.nsources > 0 and source is not None:
             self.f[self.first_source_idx:, 0] = np.atleast_1d(source)
 
-        # [bj] put it out of update context, to see if there is bug
         # copy c_old
+        # [bj] put this out of update context
         self.c_old = self.c.copy()
 
         # Compute c_in
@@ -834,8 +757,6 @@ class CMR2(object):
             norm_s = np.sqrt(np.sum(self.c_in[self.ntemporal:] ** 2))
             if norm_s != 0:
                 self.c_in[self.ntemporal:] /= norm_s
-        # print("c_in:\n", self.c_in) #
-        # self.time1 += time.time() - t
 
         ##########
         #
@@ -843,16 +764,12 @@ class CMR2(object):
         #
         ##########
 
-        # t = time.time()
         if update_context:
-
-            # print("f:\n", self.f) #
 
             # Set beta separately for temporal and source subregions
             beta_vec = np.empty_like(self.c)
             beta_vec[:self.ntemporal] = self.beta
             beta_vec[self.ntemporal:] = self.beta_source
-            # print("beta_vec:",beta_vec) #
 
             # Calculate rho for the temporal and source subregions
             rho_vec = np.empty_like(self.c)
@@ -862,10 +779,7 @@ class CMR2(object):
             rho_vec[self.ntemporal:] = math.sqrt(1 + self.beta_source ** 2 * (c_dot_s ** 2 - 1)) - self.beta_source * c_dot_s
 
             # Update context
-            # self.c_old = self.c.copy()
             self.c = (rho_vec * self.c_old) + (beta_vec * self.c_in)
-            # print("c:\n", self.c) #
-        # self.time2 += time.time() - t
 
         ##########
         #
@@ -873,28 +787,26 @@ class CMR2(object):
         #
         ##########
 
-        # t = time.time()
         if update_weights:
             # self.M_FC += self.L_FC * np.dot(self.c_old, self.f.T)
+            # [bj] to minimize computation load
             self.M_FC[:self.nitems_unique,:self.nitems_unique] += self.L_FC[:self.nitems_unique,:self.nitems_unique] \
                                                                   * np.dot(self.c_old[:self.nitems_unique], self.f[:self.nitems_unique].T)
-
             if self.task == 'FR':
                 if self.phase == 'encoding':  # Only apply primacy scaling during encoding
                     self.M_CF += self.L_CF * self.prim_vec[self.serial_position] * np.dot(self.f, self.c_old.T)
                 else:
                     self.M_CF += self.L_CF * np.dot(self.f, self.c_old.T)
-
-            # if self.task == 'CR': # jbg: pair association!
-            #     self.pair_association = self.params['d_ass'] * np.dot(self.f, self.f.T)
-            #     np.fill_diagonal(self.pair_association, 0)
-            #     self.M_FC += self.L_FC * self.pair_association
-            #     self.M_CF += self.L_CF * self.prim_vec[self.serial_position] * self.pair_association
-        # self.time3 += time.time() - t
+            if self.task == 'CR': # [bj] pair association
+                self.pair_association = self.params['d_ass'] * np.dot(self.f, self.f.T)
+                np.fill_diagonal(self.pair_association, 0)
+                self.M_FC += self.L_FC * self.pair_association
+                self.M_CF += self.L_CF * self.prim_vec[self.serial_position] * self.pair_association
 
     def simulate_recall(self, time_limit=60000, max_recalls=np.inf):
         """
         Simulate a recall period, starting from the current state of context.
+        [Unchanged from CMR2]
 
         :param time_limit: The simulated duration of the recall period (in ms).
             Determines how many cycles of the leaky accumulator will run before
@@ -947,28 +859,26 @@ class CMR2(object):
                     self.rec_items[-1].append(rec_itemno)
                     self.rec_times[-1].append(cycles_elapsed * self.params['dt'])
 
-    def cued_recall(self, cue_idx, time_limit=5000):
+    def simulate_cr(self, cue_idx, time_limit=5000):
         """
-        Simulate a cued recall.
+        Simulate a cued recall. [Newly added by Beige]
 
         :param cue_idx: The index of the provided cue in the feature vector.
         :param time_limit: The simulated duration of the recall period (in ms).
             Determines how many cycles of the leaky accumulator will run before
             the recall period ends. (DEFAULT=5000)
         """
-
         cycles_elapsed = 0
         max_cycles = time_limit // self.params['dt']
 
         # present cue and update the context
-
         self.present_item(self.cues_indexes[self.trial_idx,cue_idx], source=None, update_context=True, update_weights=False)
         self.ret_thresh[self.cues_indexes[self.trial_idx,cue_idx]] = np.inf # can't recall the cue!
-        # print("recall", cue_idx, "c:\n", self.c)  #
+        # print("recall", cue_idx, "c:\n", self.c)
 
         # Use context to cue items
         f_in = np.dot(self.M_CF, self.c)[:self.nitems_unique].flatten()
-        # print("recall", cue_idx, "f_in:\n", f_in)  #
+        # print("recall", cue_idx, "f_in:\n", f_in)
 
         # Identify set of items with the highest activation
         # jbg: argsort returns the original index of the sorted order
@@ -976,7 +886,7 @@ class CMR2(object):
         top_activation = f_in[top_items]
         top_activation[top_activation < 0] = 0
 
-        # print("recall", cue_idx,"threshold:\n",self.ret_thresh) #
+        # print("recall", cue_idx,"threshold:\n",self.ret_thresh)
         # Run accumulator until an item is retrieved
         # jbg: winnder_idx is the index with in top_activation
         winner_idx, ncycles = self.leaky_accumulator(top_activation, self.ret_thresh[top_items],
@@ -1003,7 +913,7 @@ class CMR2(object):
             # Filter intrusions using temporal context comparison, and log item if overtly recalled
             c_similarity = np.dot(self.c_old[:self.ntemporal].T, self.c_in[:self.ntemporal])
             if c_similarity >= self.params['c_thresh']:
-                # print("recall", cue_idx, "recall item index:\n", item)  #
+                # print("recall", cue_idx, "recall item index:\n", item)
                 rec_itemno = self.all_nos_unique[item] #[bj]
                 self.rec_items[-1].append(rec_itemno)
                 self.rec_times[-1].append(cycles_elapsed * self.params['dt'])
@@ -1017,39 +927,33 @@ class CMR2(object):
 
     def simulate_recog(self, cue_idx):
         """
-        Simulate a recognition.
+        Simulate a recognition. [Newly added by Beige]
 
         :param cue_idx: The index of the provided cue in the feature vector.
         """
-
         # present cue and update the context
         if self.mode == "Final":
             self.present_item(cue_idx, source=None, update_context=True, update_weights=False)
         elif self.mode == "Continuous":
             self.present_item(cue_idx, source=None, update_context=False, update_weights=False)
-        # print("recall", self.cue_position, "c:\n", self.c)  #
 
         # Recognition or not using temporal context comparison
         # 1 means recognition YES, 0 means recognition NO
-
         # c_similarity, rt = self.diffusion(self.c_old[:self.nitems_unique], self.c_in[:self.nitems_unique], max_time=self.params['rec_time_limit'])
-        c_similarity = np.dot(self.c_old[:self.nitems_unique].T, self.c_in[:self.nitems_unique]) # [bj]!! similarity should not include distractors
-        # rt = 0
-        rt = self.params['a'] * np.exp(-1 * self.params['b'] * np.abs(c_similarity - self.params['c_thresh'])) #!!
-        # self.recog_similarity.append(c_similarity[0,0].tolist())
+        c_similarity = np.dot(self.c_old[:self.nitems_unique].T, self.c_in[:self.nitems_unique]) # !! similarity should not include distractors
+        rt = self.params['a'] * np.exp(-1 * self.params['b'] * np.abs(c_similarity - self.params['c_thresh'])) # !!
         self.recog_similarity.append(c_similarity.item())
         self.rec_times.append(rt.item())
 
-        # print("similarity:",c_similarity) #
         if c_similarity >= self.params['c_thresh']:
-            # print("recall", self.cue_position, "recognition judgement:\n","YES")  #
             self.rec_items.append(1)
         else:
-            # print("recall", self.cue_position, "recognition judgement:\n","NO")  #
             self.rec_items.append(0)
 
-    def diffusion(self,c1,c2,max_time=5000):
-
+    def diffusion(self, c1, c2,max_time=5000):
+        """
+        An experimental mechanism to calculate RT. Not used for now. [Newly added by Beige]
+        """
         if len(c1) != len(c2):
             print('err')
         len_c = len(c1)
@@ -1079,7 +983,7 @@ class CMR2(object):
     def leaky_accumulator(self, float [:] in_act, float [:] x_thresholds, Py_ssize_t max_cycles):
         """
         Simulates the item retrieval process using a leaky accumulator. Loops
-        until an item is retrieved or the recall period ends.
+        until an item is retrieved or the recall period ends. [Unchanged from CMR2]
 
         :param in_act: A 1D array containing the incoming activation values
             for all items in the competition.
@@ -1193,7 +1097,7 @@ def make_params(source_coding=False):
     Returns a dictionary containing all parameters that need to be defined in
     order for CMR2 to run. Can be used as a template for the "params" input
     required by CMR2, run_cmr2_single_sess(), and run_cmr2_multi_sess().
-    For notes on each parameter, see in-line comments.
+    For notes on each parameter, see in-line comments. [Modified by Beige]
 
     :param source_coding: If True, parameter dictionary will contain the
         parameters required for the source coding version of the model. If
@@ -1231,7 +1135,7 @@ def make_params(source_coding=False):
         'max_recalls': 50,  # Maximum recalls allowed per trial (Defaults to 50)
         'learn_while_retrieving': False,  # Whether associations should be learned during recall (Defaults to False)
 
-        # [bj]
+        # [bj] Parameters for exponential RT in recognition
         'a': None,
         'b': None
     }
@@ -1258,6 +1162,13 @@ def make_params(source_coding=False):
     return param_dict
 
 def make_default_params():
+    """
+    Returns a dictionary containing all parameters that need to be defined in
+    order for CMR_IA to run, with default value. [Newly added by Beige]
+
+    :returns: A dictionary containing all of the parameters you need to define
+        to run CMRIA, with default value.
+    """
     param_dict = make_params()
     param_dict.update(
         beta_enc = 0.5,
@@ -1286,7 +1197,7 @@ def load_pres(path):
     """
     Loads matrix of presented items from a .txt file, a .json behavioral data,
     file, or a .mat behavioral data file. Uses numpy's loadtxt function, json's
-    load function, or scipy's loadmat function, respectively.
+    load function, or scipy's loadmat function, respectively. [Unchanged from CMR2]
 
     :param path: The path to a .txt, .json, or .mat file containing a matrix
         where item (i, j) is the jth word presented on trial i.
@@ -1310,7 +1221,7 @@ def split_data(pres_mat, identifiers, source_mat=None):
     """
     If data from multiple subjects or sessions are in one matrix, separate out
     the data into separate presentation and source matrices for each unique
-    identifier.
+    identifier. [Unchanged from CMR2]
 
     :param pres_mat: A 2D array of presented items from multiple consolidated
         subjects or sessions.
@@ -1347,6 +1258,7 @@ def split_data(pres_mat, identifiers, source_mat=None):
 def run_cmr2_single_sess(params, pres_mat, sem_mat, source_mat=None, mode='IFR'):
     """
     Simulates a single session of free recall using the specified parameter set.
+    [Unchanged from CMR2]
 
     :param params: A dictionary of model parameters and settings to use for the
         simulation. Call the CMR2_pack_cyth.make_params() function to get a
@@ -1403,6 +1315,7 @@ def run_cmr2_single_sess(params, pres_mat, sem_mat, source_mat=None, mode='IFR')
 def run_cmr2_multi_sess(params, pres_mat, identifiers, sem_mat, source_mat=None, mode='IFR'):
     """
     Simulates multiple sessions of free recall using a single set of parameters.
+    [Unchanged from CMR2]
 
     :param params: A dictionary of model parameters and settings to use for the
         simulation. Call the CMR2_pack_cyth.make_params() function to get a
@@ -1465,24 +1378,15 @@ def run_cmr2_multi_sess(params, pres_mat, identifiers, sem_mat, source_mat=None,
 
     return rec_mat, time_mat
 
-def run_recog_multi_sess(params, data_dict, sem_mat, source_mat=None, task='Recog', mode='Final'):
+def run_peers_recog_multi_sess(params, data_dict, sem_mat, source_mat=None, task='Recog', mode='Final'):
     """
-    Simulates multiple sessions of free recall using a single set of parameters.
+    Simulates multiple sessions of peers recognition using a single set of parameters.
+    [Newly added by Beige]
 
     :param params: A dictionary of model parameters and settings to use for the
-        simulation. Call the CMR2_pack_cyth.make_params() function to get a
+        simulation. Call the CMR_IA.make_params() function to get a
         dictionary template you can fill in with your desired values.
-    :param pres_mat: A 2D array specifying the ID numbers of the words that will be
-        presented to the model on each trial. Row i, column j should hold the ID number
-        of the jth word to be presented on the ith trial. ID numbers are assumed to
-        range from 1 to N, where N is the number of words in the semantic similarity
-        matrix (sem_mat). 0s are treated as padding and are ignored, allowing you to
-        zero-pad pres_mat if you wish to simulate trials with varying list length.
-    :param identifiers: A 1D array of session numbers, subject IDs, or other values
-        indicating how the rows/trials in pres_mat and source_mat should be divided up
-        into sessions. For example, one could simulate two four-trial sessions by
-        setting identifiers to np.array([0, 0, 0, 0, 1, 1, 1, 1]), specifying that the
-        latter four trials come from a different session than the first four trials.
+    :param data_dict: a dictionary contains pres_mat, rec_mat, ffr_mat, cue_mat.
     :param sem_mat: A 2D array containing the pairwise semantic similarities between all
         words in the word pool. The ordering of words in the similarity matrix must
         match the word ID numbers, such that the scores for word k must be located along
@@ -1493,12 +1397,13 @@ def run_recog_multi_sess(params, data_dict, sem_mat, source_mat=None, task='Reco
         position, with the third dimension having length equal to the number of source
         features you wish to simulate. Cell (i, j, k) should contain the value of the
         kth source feature of the jth item presented on list i. (DEFAULT=None)
-    :param mode: A string indicating the type of free recall to simulate. Set to 'IFR'
-        for immediate free recall or 'DFR' for delayed recall. (DEFUALT='IFR')
+    :param task: Recognition. (DEFAULT='Recog')
+    :param mode: A string indicating the type of recognition to simulate. Set to 'Final'
+        for PEERS recognition. (DEFUALT='IFR')
 
-    :returns: Two 2D arrays. The first contains the ID numbers of the items the model
-        recalled on each trial. The second contains the response times of each of
-        those items relative to the start of the recall period.
+    :returns: Three dictionaries. The first contains the recognition response for each item.
+        The second contains the reaction time for each response. The third contains the
+        simulated context similarity for each item.
     """
     now_test = time.time()
 
@@ -1513,7 +1418,7 @@ def run_recog_multi_sess(params, data_dict, sem_mat, source_mat=None, task='Reco
         # run CMR for each session
         cmr = CMR2(params, pres_mat, sem_mat, source_mat=None,
                    rec_mat=rec_mat, ffr_mat=ffr_mat, cue_mat=cue_mat, task='Recog', mode=mode)
-        cmr.run_recog_single_sess()
+        cmr.run_peers_recog_single_sess()
 
         recog_dict[sess] = cmr.rec_items
         rt_dict[sess] = cmr.rec_times
@@ -1523,19 +1428,19 @@ def run_recog_multi_sess(params, data_dict, sem_mat, source_mat=None, task='Reco
 
     return recog_dict, rt_dict, csim_dict
 
-def run_continuous_recog_multi_sess(params, df, sem_mat, source_mat=None, task='Recog', mode='Continuous'):
+def run_conti_recog_multi_sess(params, df, sem_mat, source_mat=None, task='Recog', mode='Continuous'):
     """
-    Simulates multiple sessions of free recall using a single set of parameters.
+    Simulates multiple sessions of continuous recognition using a single set of parameters.
+    [Newly added by Beige]
 
     :param params: A dictionary of model parameters and settings to use for the
-        simulation. Call the CMR2_pack_cyth.make_params() function to get a
+        simulation. Call the CMR_IA.make_params() function to get a
         dictionary template you can fill in with your desired values.
-    :param df: The recognition DataFrame.
-    :param identifiers: A 1D array of session numbers, subject IDs, or other values
-        indicating how the rows/trials in pres_mat and source_mat should be divided up
-        into sessions. For example, one could simulate two four-trial sessions by
-        setting identifiers to np.array([0, 0, 0, 0, 1, 1, 1, 1]), specifying that the
-        latter four trials come from a different session than the first four trials.
+    :param df: A dataframe of experiment design. This dataframe should have these
+        3 columns: "session", "position", "itemno". Each row corresponds to a trial.
+        "session" specifies the session, "position" specifies the sequence of items
+        within a session, and "itemno" specifies which item is presented. "itemno" should
+        correspond to sem_mat.
     :param sem_mat: A 2D array containing the pairwise semantic similarities between all
         words in the word pool. The ordering of words in the similarity matrix must
         match the word ID numbers, such that the scores for word k must be located along
@@ -1546,12 +1451,13 @@ def run_continuous_recog_multi_sess(params, df, sem_mat, source_mat=None, task='
         position, with the third dimension having length equal to the number of source
         features you wish to simulate. Cell (i, j, k) should contain the value of the
         kth source feature of the jth item presented on list i. (DEFAULT=None)
-    :param mode: A string indicating the type of free recall to simulate. Set to 'IFR'
-        for immediate free recall or 'DFR' for delayed recall. (DEFUALT='IFR')
+    :param task: Recognition. (DEFAULT='Recog')
+    :param mode: A string indicating the type of free recall to simulate. Set to 'Continuous'
+        for continuous recognition. (DEFUALT='Continuous')
 
-    :returns: Two 2D arrays. The first contains the ID numbers of the items the model
-        recalled on each trial. The second contains the response times of each of
-        those items relative to the start of the recall period.
+    :returns: A dataframe with 6 columns: "session", "position", "itemno", "s_resp", "s_rt", "csim".
+        The first three columns are identical to those in input df. The last three columns
+        indicates the simulated response, reaction time and context similarity respectively.
     """
     now_test = time.time()
 
@@ -1567,7 +1473,7 @@ def run_continuous_recog_multi_sess(params, df, sem_mat, source_mat=None, task='
         # run CMR for each session
         cmr = CMR2(params, pres_mat, sem_mat, source_mat=None,
                    rec_mat=None, ffr_mat=None, cue_mat=cue_mat, task=task, mode=mode)
-        cmr.run_continuous_recog_single_sess()
+        cmr.run_conti_recog_single_sess()
 
         recs = cmr.rec_items
         rts = cmr.rec_times
