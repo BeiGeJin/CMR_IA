@@ -14,7 +14,6 @@ from libc.math cimport log, sqrt
 cimport numpy as np
 cimport cython
 
-
 """
 Known differences from Lynn Lohnas's                                                                                                                                                                                                                                                                                                                                                                                                                                                               code:
 1) Cycle counter starts at 0 in this code instead of 1 during leaky accumulator.
@@ -1428,6 +1427,62 @@ def run_peers_recog_multi_sess(params, data_dict, sem_mat, source_mat=None, task
 
     return recog_dict, rt_dict, csim_dict
 
+def run_norm_recog_multi_sess(params, df_study, df_test, sem_mat, source_mat=None, task='Recog', mode='Final'):
+    """
+    Simulates multiple sessions of normal recognition using a single set of parameters.
+    [Newly added by Beige]
+
+    :param params: A dictionary of model parameters and settings to use for the
+        simulation. Call the CMR_IA.make_params() function to get a
+        dictionary template you can fill in with your desired values.
+    :param df_study: a dataframe containing study list.
+    :param df_test: a dataframe containing test list.
+    :param sem_mat: A 2D array containing the pairwise semantic similarities between all
+        words in the word pool. The ordering of words in the similarity matrix must
+        match the word ID numbers, such that the scores for word k must be located along
+        row k-1 and column k-1.
+    :param source_mat: If None, source coding will not be used. Otherwise, source_mat
+        should be a 3D array containing source features for each presented word. The
+        matrix should have one row for each trial and one column for each serial
+        position, with the third dimension having length equal to the number of source
+        features you wish to simulate. Cell (i, j, k) should contain the value of the
+        kth source feature of the jth item presented on list i. (DEFAULT=None)
+    :param task: Recognition. (DEFAULT='Recog')
+    :param mode: A string indicating the type of recognition to simulate. Set to 'Final'
+        for PEERS recognition. (DEFUALT='IFR')
+
+    :returns: Three dictionaries. The first contains the recognition response for each item.
+        The second contains the reaction time for each response. The third contains the
+        simulated context similarity for each item.
+    """
+    now_test = time.time()
+
+    sessions = np.unique(df_study.session)
+    df_thin = df_test[['session','itemno']]
+    df_thin = df_thin.assign(s_resp=np.nan, s_rt=np.nan, csim=np.nan)
+
+    for sess in sessions:
+        # extarct the session data
+        pres_mat = df_study.loc[df_study.session==sess,'itemno'].to_numpy()
+        pres_mat = np.reshape(pres_mat,(1, len(pres_mat)))
+        cue_mat = df_thin.loc[df_thin.session==sess,'itemno'].to_numpy()
+
+        # run CMR for each session
+        cmr = CMR2(params, pres_mat, sem_mat, source_mat=None,
+                   rec_mat=None, ffr_mat=None, cue_mat=cue_mat, task='Recog', mode=mode)
+        cmr.run_peers_recog_single_sess()
+
+        recs = cmr.rec_items
+        rts = cmr.rec_times
+        csims = cmr.recog_similarity
+        result = np.column_stack((recs,rts,csims))
+
+        df_thin.loc[df_thin.session==sess, ['s_resp','s_rt','csim']] = result
+
+    print("CMR Time: " + str(time.time() - now_test))
+
+    return df_thin
+
 def run_conti_recog_multi_sess(params, df, sem_mat, source_mat=None, task='Recog', mode='Continuous'):
     """
     Simulates multiple sessions of continuous recognition using a single set of parameters.
@@ -1480,7 +1535,7 @@ def run_conti_recog_multi_sess(params, df, sem_mat, source_mat=None, task='Recog
         csims = cmr.recog_similarity
         result = np.column_stack((recs,rts,csims))
 
-        df_thin.loc[df.session==sess, ['s_resp','s_rt','csim']] = result
+        df_thin.loc[df_thin.session==sess, ['s_resp','s_rt','csim']] = result
 
     print("CMR Time: " + str(time.time() - now_test))
 
