@@ -209,6 +209,13 @@ class CMR2(object):
             self.ffr_indexes = np.searchsorted(self.all_nos_unique, self.ffr_nos)
         if self.have_cue:
             self.cues_indexes = np.searchsorted(self.all_nos_unique, self.cues_nos)
+
+        # [bj] Sut up elevated-attention scaling vector for all itemno
+        self.sem_mean = np.mean(self.sem_mat, axis=1)
+        # self.att_vec = np.ones(len(self.sem_mean)) + self.params['n'] * np.exp(-1 * self.params['m'] * (self.sem_mean - self.params['t'])) + self.params['p']
+        self.att_vec = self.params['m'] * self.sem_mean + self.params['n']
+        self.att_vec[self.att_vec > 1/self.params['gamma_fc']] = 1/self.params['gamma_fc']
+        self.att_vec[self.att_vec < 0] = 0
         ### [Beige edited end]
 
         # Cut down semantic matrix to contain only the items in the session
@@ -544,8 +551,12 @@ class CMR2(object):
                 pres_idx = self.pres_indexes[self.trial_idx, self.serial_position] # [bj] if word-pair, give a pair
                 source = self.sources[self.trial_idx, self.serial_position] if self.nsources > 0 else None
                 self.beta = self.params['beta_enc']
+                # f_s = self.att_vec[self.all_nos_unique[pres_idx] - 1]
+                # b = np.log(1 / self.params['beta_enc'] - 1)
+                # self.beta = 1 / (1 + np.exp(f_s + b)) if f_s > 0 else self.params['beta_enc']
                 self.beta_source = self.params['beta_source'] if self.nsources > 0 else 0
                 # print("encoding",self.serial_position,"item index:\n", pres_idx)  #
+                # print("encoding",self.serial_position, "is", self.beta)  #
                 self.present_item(pres_idx, source, update_context=True, update_weights=True)
                 # print("encoding",self.serial_position,"M_FC:\n",self.M_FC)
                 # print("encoding",self.serial_position,"phi:\n",self.prim_vec[self.serial_position])
@@ -645,6 +656,7 @@ class CMR2(object):
         3) Item presentation as encoding
         4) Loop step 1-3
         9.12 update: beta_enc for new judgement and beta_rec for old judgement
+        11.16? update: allow for paired presentation
         [Newly added by Beige]
         """
         for trial_idx in range(self.nlists):
@@ -789,8 +801,15 @@ class CMR2(object):
         if update_weights:
             # self.M_FC += self.L_FC * np.dot(self.c_old, self.f.T)
             # [bj] to minimize computation load
-            self.M_FC[:self.nitems_unique,:self.nitems_unique] += self.L_FC[:self.nitems_unique,:self.nitems_unique] \
-                                                                  * np.dot(self.c_old[:self.nitems_unique], self.f[:self.nitems_unique].T)
+            if self.phase == 'encoding': # [bj] Only apply elevated-attention scaling during encoding
+                self.M_FC[:self.nitems_unique,:self.nitems_unique] \
+                    += self.L_FC[:self.nitems_unique,:self.nitems_unique] \
+                       * np.dot(self.c_old[:self.nitems_unique], self.f[:self.nitems_unique].T) \
+                       * self.att_vec[self.all_nos_unique[item_idx]-1]
+            else:
+                self.M_FC[:self.nitems_unique,:self.nitems_unique] \
+                    += self.L_FC[:self.nitems_unique,:self.nitems_unique] \
+                       * np.dot(self.c_old[:self.nitems_unique], self.f[:self.nitems_unique].T)
             if self.task == 'FR':
                 if self.phase == 'encoding':  # Only apply primacy scaling during encoding
                     self.M_CF += self.L_CF * self.prim_vec[self.serial_position] * np.dot(self.f, self.c_old.T)
@@ -1110,6 +1129,7 @@ def make_params(source_coding=False):
         # Beta parameters
         'beta_enc': None,  # Beta encoding
         'beta_rec': None,  # Beta recall
+        'beta_rec_new': None, # [beige] Beta recall for new items
         'beta_rec_post': None,  # Beta post-recall
         'beta_distract': None,  # Beta for distractor task
 
@@ -1136,7 +1156,11 @@ def make_params(source_coding=False):
 
         # [bj] Parameters for exponential RT in recognition
         'a': None,
-        'b': None
+        'b': None,
+
+        # [bj] Elevated-attention parameters for WFE
+        'm': None,
+        'n': None,
     }
 
     # If not using source coding, set up 2 associative scaling parameters (gamma)
@@ -1172,6 +1196,7 @@ def make_default_params():
     param_dict.update(
         beta_enc = 0.5,
         beta_rec = 0.5,
+        beta_rec_new = 0.5,
         beta_rec_post = 0.5,
         phi_s = 2,
         phi_d = 0.5,
@@ -1186,7 +1211,9 @@ def make_default_params():
         gamma_fc = 0.5,
         gamma_cf = 0.5,
         a = 2800,
-        b = 20
+        b = 20,
+        m = 0,
+        n = 0
     )
 
     return param_dict
