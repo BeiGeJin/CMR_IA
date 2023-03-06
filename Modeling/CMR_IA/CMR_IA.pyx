@@ -74,7 +74,8 @@ cdef cython_randn(int n):
 class CMR2(object):
 
     def __init__(self, params, pres_mat, sem_mat,
-                 source_mat=None, rec_mat=None, ffr_mat=None, cue_mat=None, task='FR', mode='IFR'):
+                 source_mat=None, rec_mat=None, ffr_mat=None, cue_mat=None,
+                 task='FR', mode='IFR', pair=False):
         """
         Initializes a CMR2 object and prepares it to simulate the session defined
         by pres_mat. [Modified by Beige]
@@ -107,12 +108,13 @@ class CMR2(object):
         :param cue_mat: A 1D array specifying the ID numbers of the words that are presented
             to the model in recognition. Used in simulating recognition. (DEFAULT=None)
         :param task: A string indicating the type of task to simulate. Set to 'FR' for free
-            recall or 'CR' for cued recall or 'Recog' for recognition. (DEFUALT='FR')
+            recall or 'CR' for cued recall or 'Recog' for recognition. (DEFAULT='FR')
         :param mode: A string indicating the type of task mode to simulate. For task = 'FR',
             set to 'IFR' for immediate free recall or 'DFR' for delayed recall; for task = 'CR',
             set to 'Simultaneous' for simultaneous encoding or 'Sequential' for sequential encoding;
             for task = 'Recog', set to 'Continuous' for continuous recognition or 'Final' for a
-            recognition in final stage. (DEFUALT='IFR')
+            recognition in final stage. (DEFAULT='IFR')
+        :param pair: whether presenting word pair. (DEFAULT = False)
         """
         ##########
         #
@@ -121,7 +123,7 @@ class CMR2(object):
         ##########
 
         # Convert input parameters
-        self.recog_similarity = [] #
+        self.recog_similarity = [] # [bj]
         self.params = params  # Dictionary of model parameters
         self.pres_nos = np.array(pres_mat, dtype=np.int16)  # Presented item ID numbers (trial x serial position)
         self.sem_mat = np.array(sem_mat, dtype=np.float32)  # Semantic similarity matrix (e.g. Word2vec, LSA, WAS)
@@ -161,7 +163,7 @@ class CMR2(object):
             raise ValueError('%s task must has a cue matrix.' % task)
         self.task = task
         # input mode
-        if mode not in ('IFR', 'DFR','Simultaneous','Sequential','Continuous','Final'):
+        if mode not in ('IFR', 'DFR','Simultaneous','Sequential','Continuous','Final', 'Hockley'):
             raise ValueError('Mode must be "IFR" or "DFR", not %s.' % mode)
         self.mode = mode
         # input learn_while_retrieving
@@ -172,14 +174,18 @@ class CMR2(object):
         self.max_list_length = self.pres_nos.shape[1]
 
         # Determine and unpair when presented word pairs
-        if self.pres_nos.ndim == 3:  # whether presented word-pairs
-            self.word_pair = True
-        else:
-            self.word_pair = False
-        if self.word_pair: # unpair word-pairs
+        self.paired_pres = self.pres_nos.ndim == 3 # whether presented word-pairs
+        if self.paired_pres: # unpair word-pairs
             self.pres_nos_unpair = np.reshape(self.pres_nos,(self.nlists,self.max_list_length*self.pres_nos.shape[2]))
         else:
             self.pres_nos_unpair = self.pres_nos
+
+        # Determine when cue word pairs
+        self.paired_cues = self.cues_nos.ndim == 2
+        # if self.paired_cues: # unpair word-pairs
+        #     self.cues_nos_unpair = self.cues_nos.flatten()
+        # else:
+        #     self.cues_nos_unpair = self.cues_nos
 
         # Create arrays of sorted and unique (nonzero) items
         self.pres_nonzero_mask = self.pres_nos > 0
@@ -195,7 +201,9 @@ class CMR2(object):
             self.all_nos = np.concatenate((self.all_nos, self.ffr_nos_nonzero), axis=None)
             self.extra_distract += 1
         if self.have_cue:
-            self.all_nos = np.concatenate((self.all_nos,self.cues_nos),axis=None)
+            self.cues_nonzero_mask = self.cues_nos > 0
+            self.cues_nos_nonzero = self.cues_nos[self.cues_nonzero_mask]  # reduce to 1D
+            self.all_nos = np.concatenate((self.all_nos,self.cues_nos_nonzero),axis=None)
             if self.mode == 'Final': # for PEERS task
                 self.extra_distract += 1
         self.all_nos_sorted = np.sort(self.all_nos)
@@ -208,14 +216,22 @@ class CMR2(object):
         if self.have_ffr:
             self.ffr_indexes = np.searchsorted(self.all_nos_unique, self.ffr_nos)
         if self.have_cue:
-            self.cues_indexes = np.searchsorted(self.all_nos_unique, self.cues_nos)
+            cue_indexer = lambda x: np.searchsorted(self.all_nos_unique, x) if x > 0 else x
+            cue_func = np.vectorize(cue_indexer)
+            self.cues_indexes = cue_func(self.cues_nos)
+            # self.cues_indexes = np.searchsorted(self.all_nos_unique, self.cues_nos)
 
-        # [bj] Sut up elevated-attention scaling vector for all itemno
+        # Set up elevated-attention scaling vector for all itemno
         self.sem_mean = np.mean(self.sem_mat, axis=1)
         # self.att_vec = np.ones(len(self.sem_mean)) + self.params['n'] * np.exp(-1 * self.params['m'] * (self.sem_mean - self.params['t'])) + self.params['p']
         self.att_vec = self.params['m'] * self.sem_mean + self.params['n']
         self.att_vec[self.att_vec > 1/self.params['gamma_fc']] = 1/self.params['gamma_fc']
         self.att_vec[self.att_vec < 0] = 0
+
+        # extract model-calculated word frequency
+        self.b0 = 6.8657
+        self.b1 = -12.7856
+        self.cal_word_freq = np.exp(self.b0 + self.sem_mean * self.b1)
         ### [Beige edited end]
 
         # Cut down semantic matrix to contain only the items in the session
@@ -225,6 +241,10 @@ class CMR2(object):
 
         # Initial phase
         self.phase = None
+
+        # Initial beta [Beige]
+        self.beta = 0
+        self.beta_source = 0
 
         ##########
         #
@@ -717,6 +737,128 @@ class CMR2(object):
             # print("encoding M_FC:\n",self.M_FC) #
             # print("Encoding End!")  #
 
+    def run_hockley_recog_single_sess(self):
+        """
+        Simulates a session of continuous recognition, consisting of the following steps:
+        1) Pre-session context initialization / between-trial distractor
+        3) Item presentation as encoding
+        4) Loop step 1-3
+        [Newly added by Beige]
+        """
+
+        phases = ['pretrial','encoding','recognition']
+        for trial_idx in range(self.nlists):
+            for phase in phases:
+                self.phase = phase
+
+                if self.phase == 'pretrial':
+                    #####
+                    # Shift context before each trial
+                    #####
+                    # On first trial, present orthogonal item that starts the system
+                    # On subsequent trials, present an interlist distractor item
+                    # Assume source context changes at same rate as temporal between trials
+                    self.beta = 1 if trial_idx == 0 else self.params['beta_rec_post']
+                    self.beta_source = 1 if trial_idx == 0 else self.params['beta_rec_post']
+                    source = None
+                    self.present_item(self.distractor_idx, source, update_context=True, update_weights=False)
+                    self.distractor_idx += 1
+                    self.serial_position = 0
+                    # print("pre c_in:\n", self.c_in)  #
+                    # print("pre c:\n", self.c)  #
+                    # print("pre M_FC:\n",self.M_FC)  #
+
+                if self.phase == 'encoding':
+                    #####
+                    # Present items
+                    #####
+                    # print(self.phase)
+                    pres_idx = self.pres_indexes[trial_idx, self.serial_position]
+                    # print(pres_idx)
+                    source = None
+                    self.beta = self.params['beta_enc']
+                    self.beta_source = 0
+                    self.present_item(pres_idx, source, update_context=True, update_weights=True)
+                    # print("encoding c_in:\n", self.c_in)  #
+                    # print("encoding c:\n", self.c)  #
+                    # print("encoding M_FC:\n",self.M_FC) #
+
+                if self.phase == 'recognition':
+                    #####
+                    # Simulate recognition
+                    #####
+                    # print(self.phase)
+                    self.beta = self.params['beta_rec']
+                    self.beta_source = 0
+                    cue_idx = self.cues_indexes[trial_idx]
+                    # print(cue_idx)
+                    if len(cue_idx) == 2:
+                        if cue_idx[1] == -1:
+                            cue_idx = cue_idx[0].astype(int)
+                    self.simulate_recog(cue_idx)
+                    # print("recog c_old:\n", self.c_old)
+                    # print("recog c_in:\n", self.c_in)  #
+
+    def run_norm_cr_single_sess(self):
+        """
+        Simulates a standard trial of cued recall, consisting of the following steps:
+        1) A pre-trial context shift
+        2) A sequence of item (word pair) presentations
+        3) A recall period
+        [Newly added by Beige]
+        """
+
+        phases = ['pretrial', 'encoding', 'shift', 'recall']
+        for trial_idx in range(self.nlists):
+            for phase in phases:
+                self.phase = phase
+
+                if self.phase == 'pretrial' or self.phase == 'shift':
+                    #####
+                    # Shift context before each trial
+                    #####
+                    # On first trial, present orthogonal item that starts the system
+                    # On subsequent trials, present an interlist distractor item
+                    # Assume source context changes at same rate as temporal between trials
+                    self.beta = 1 if self.phase == 'pretrial' else self.params['beta_rec_post']
+                    self.beta_source = 1 if self.phase == 'pretrial' else self.params['beta_rec_post']
+                    source = None
+                    self.present_item(self.distractor_idx, source, update_context=True, update_weights=False)
+                    self.distractor_idx += 1
+                    self.serial_position = 0
+                    # print("pre c_in:\n", self.c_in)  #
+                    # print("pre c:\n", self.c)  #
+                    # print("pre M_FC:\n",self.M_FC)  #
+
+                if self.phase == 'encoding':
+                    #####
+                    # Present items
+                    #####
+                    for self.serial_position in range(self.pres_indexes.shape[1]):
+                        # print(self.phase)
+                        pres_idx = self.pres_indexes[trial_idx, self.serial_position]
+                        # print(pres_idx)
+                        source = None
+                        self.beta = self.params['beta_enc']
+                        self.beta_source = 0
+                        self.present_item(pres_idx, source, update_context=True, update_weights=True)
+                        # print("encoding c_in:\n", self.c_in)  #
+                        # print("encoding c:\n", self.c)  #
+                        # print("encoding M_FC:\n",self.M_FC) #
+
+                if self.phase == 'recall':
+                    #####
+                    # Simulate cued recall
+                    #####
+                    # print(self.phase)
+                    self.beta = self.params['beta_rec']
+                    self.beta_source = 0
+                    cue_idx = self.cues_indexes[trial_idx]
+                    # print("before cue:\n",self.c)
+                    # print(cue_idx)
+                    self.simulate_cr(cue_idx)
+                    # print("recog c_old:\n", self.c_old) #
+                    # print("recog c_in:\n", self.c_in)  #
 
     def present_item(self, item_idx, source=None, update_context=True, update_weights=True):
         """
@@ -743,6 +885,8 @@ class CMR2(object):
         # Activate item's features
         #
         ##########
+
+        paired_pres = np.logical_not(np.isscalar(item_idx))
 
         # Activate the presented item itself
         self.f.fill(0)
@@ -801,25 +945,32 @@ class CMR2(object):
         if update_weights:
             # self.M_FC += self.L_FC * np.dot(self.c_old, self.f.T)
             # [bj] to minimize computation load
+            # if self.task == 'FR':
+            #     if self.phase == 'encoding':  # Only apply primacy scaling during encoding
+            #         self.M_CF += self.L_CF * self.prim_vec[self.serial_position] * np.dot(self.f, self.c_old.T)
+            #     else:
+            #         self.M_CF += self.L_CF * np.dot(self.f, self.c_old.T)
             if self.phase == 'encoding': # [bj] Only apply elevated-attention scaling during encoding
                 self.M_FC[:self.nitems_unique,:self.nitems_unique] \
                     += self.L_FC[:self.nitems_unique,:self.nitems_unique] \
                        * np.dot(self.c_old[:self.nitems_unique], self.f[:self.nitems_unique].T) \
-                       * self.att_vec[self.all_nos_unique[item_idx]-1]
+                       * np.mean(self.att_vec[self.all_nos_unique[item_idx]-1])
+                self.M_CF[:self.nitems_unique,:self.nitems_unique] \
+                    += self.L_CF[:self.nitems_unique,:self.nitems_unique] \
+                       * np.dot(self.f[:self.nitems_unique], self.c_old[:self.nitems_unique].T) \
+                       * np.mean(self.att_vec[self.all_nos_unique[item_idx]-1])
             else:
                 self.M_FC[:self.nitems_unique,:self.nitems_unique] \
                     += self.L_FC[:self.nitems_unique,:self.nitems_unique] \
                        * np.dot(self.c_old[:self.nitems_unique], self.f[:self.nitems_unique].T)
-            if self.task == 'FR':
-                if self.phase == 'encoding':  # Only apply primacy scaling during encoding
-                    self.M_CF += self.L_CF * self.prim_vec[self.serial_position] * np.dot(self.f, self.c_old.T)
-                else:
-                    self.M_CF += self.L_CF * np.dot(self.f, self.c_old.T)
-            if self.task == 'CR': # [bj] pair association
-                self.pair_association = self.params['d_ass'] * np.dot(self.f, self.f.T)
-                np.fill_diagonal(self.pair_association, 0)
-                self.M_FC += self.L_FC * self.pair_association
-                self.M_CF += self.L_CF * self.prim_vec[self.serial_position] * self.pair_association
+                self.M_CF[:self.nitems_unique,:self.nitems_unique] \
+                    += self.L_CF[:self.nitems_unique,:self.nitems_unique] \
+                       * np.dot(self.f[:self.nitems_unique], self.c_old[:self.nitems_unique].T)
+            if paired_pres: # [bj] pair association
+                pair_ass = self.params['d_ass'] * np.dot(self.f, self.f.T)
+                np.fill_diagonal(pair_ass, 0)
+                self.M_FC += self.L_FC * pair_ass
+                self.M_CF += self.L_CF * self.prim_vec[self.serial_position] * pair_ass
 
     def simulate_recall(self, time_limit=60000, max_recalls=np.inf):
         """
@@ -877,6 +1028,42 @@ class CMR2(object):
                     self.rec_items[-1].append(rec_itemno)
                     self.rec_times[-1].append(cycles_elapsed * self.params['dt'])
 
+    def simulate_recog(self, cue_idx):
+        """
+        Simulate a recognition. [Newly added by Beige]
+
+        :param cue_idx: The index of the provided cue in the feature vector.
+        """
+        # Present cue and update the context
+        paired_cue = np.logical_not(np.isscalar(cue_idx))
+        if self.mode == "Final":
+            self.present_item(cue_idx, source=None, update_context=True, update_weights=False)
+        if self.mode == "Continuous":
+            self.present_item(cue_idx, source=None, update_context=False, update_weights=False)
+        if self.mode == "Hockley":
+            if paired_cue: # pair cue
+                # print("before item1 \n", self.c)
+                self.present_item(cue_idx[0], source=None, update_context=True, update_weights=False)
+                self.present_item(cue_idx[1], source=None, update_context=True, update_weights=False)
+                # self.present_item(cue_idx, source=None, update_context=True, update_weights=False)
+            else:
+                self.present_item(cue_idx, source=None, update_context=True, update_weights=False)
+
+        # Recognize or not using context similarity
+        # c_similarity, rt = self.diffusion(self.c_old[:self.nitems_unique], self.c_in[:self.nitems_unique], max_time=self.params['rec_time_limit'])
+        # print("c_old item1 \n", self.c_old)
+        # print("c_inp item2 \n", self.c_in)
+        c_similarity = np.dot(self.c_old[:self.nitems_unique].T, self.c_in[:self.nitems_unique]) # !! similarity should not include distractors
+        rt = self.params['a'] * np.exp(-1 * self.params['b'] * np.abs(c_similarity - self.params['c_thresh'])) # !!
+        self.recog_similarity.append(c_similarity.item())
+        self.rec_times.append(rt.item())
+
+        thresh = self.params['c_thresh'] if not paired_cue else self.params['c_thresh_ass']
+        if c_similarity >= thresh:
+            self.rec_items.append(1)  # YES
+        else:
+            self.rec_items.append(0)  # NO
+
     def simulate_cr(self, cue_idx, time_limit=5000):
         """
         Simulate a cued recall. [Newly added by Beige]
@@ -890,12 +1077,14 @@ class CMR2(object):
         max_cycles = time_limit // self.params['dt']
 
         # present cue and update the context
-        self.present_item(self.cues_indexes[self.trial_idx,cue_idx], source=None, update_context=True, update_weights=False)
-        self.ret_thresh[self.cues_indexes[self.trial_idx,cue_idx]] = np.inf # can't recall the cue!
-        # print("recall", cue_idx, "c:\n", self.c)
+        self.present_item(cue_idx, source=None, update_context=True, update_weights=False)
+        self.ret_thresh[cue_idx] = np.inf # can't recall the cue!
+        # print("c_in\n:", self.c_in)
+        # print("after cue\n:", self.c)
 
         # Use context to cue items
         f_in = np.dot(self.M_CF, self.c)[:self.nitems_unique].flatten()
+        self.f_in = f_in
         # print("recall", cue_idx, "f_in:\n", f_in)
 
         # Identify set of items with the highest activation
@@ -920,7 +1109,7 @@ class CMR2(object):
             # Decay retrieval thresholds, then set the retrieved item's threshold to maximum
             self.ret_thresh = 1 + self.params['alpha'] * (self.ret_thresh - 1)
             self.ret_thresh[item] = 1 + self.params['omega']
-            self.ret_thresh[self.cues_indexes[self.trial_idx, cue_idx]] = np.inf # back to norm
+            self.ret_thresh[cue_idx] = 1 # back to norm
 
             # Present retrieved item to the model, with no source information
             if self.learn_while_retrieving:
@@ -933,40 +1122,15 @@ class CMR2(object):
             if c_similarity >= self.params['c_thresh']:
                 # print("recall", cue_idx, "recall item index:\n", item)
                 rec_itemno = self.all_nos_unique[item] #[bj]
-                self.rec_items[-1].append(rec_itemno)
-                self.rec_times[-1].append(cycles_elapsed * self.params['dt'])
+                self.rec_items.append(rec_itemno)
+                self.rec_times.append(cycles_elapsed * self.params['dt'])
             else:
-                self.rec_items[-1].append(-2) # reject
-                self.rec_times[-1].append(-2)
+                self.rec_items.append(-2) # reject
+                self.rec_times.append(-2)
 
         else:
-            self.rec_items[-1].append(-1) # fail
-            self.rec_times[-1].append(-1)
-
-    def simulate_recog(self, cue_idx):
-        """
-        Simulate a recognition. [Newly added by Beige]
-
-        :param cue_idx: The index of the provided cue in the feature vector.
-        """
-        # present cue and update the context
-        if self.mode == "Final":
-            self.present_item(cue_idx, source=None, update_context=True, update_weights=False)
-        elif self.mode == "Continuous":
-            self.present_item(cue_idx, source=None, update_context=False, update_weights=False)
-
-        # Recognition or not using temporal context comparison
-        # 1 means recognition YES, 0 means recognition NO
-        # c_similarity, rt = self.diffusion(self.c_old[:self.nitems_unique], self.c_in[:self.nitems_unique], max_time=self.params['rec_time_limit'])
-        c_similarity = np.dot(self.c_old[:self.nitems_unique].T, self.c_in[:self.nitems_unique]) # !! similarity should not include distractors
-        rt = self.params['a'] * np.exp(-1 * self.params['b'] * np.abs(c_similarity - self.params['c_thresh'])) # !!
-        self.recog_similarity.append(c_similarity.item())
-        self.rec_times.append(rt.item())
-
-        if c_similarity >= self.params['c_thresh']:
-            self.rec_items.append(1)
-        else:
-            self.rec_items.append(0)
+            self.rec_items.append(-1) # fail
+            self.rec_times.append(-1)
 
     def diffusion(self, c1, c2,max_time=5000):
         """
@@ -1145,6 +1309,8 @@ def make_params(source_coding=False):
         'omega': None,
         'alpha': None,
         'c_thresh': None,
+        'c_thresh_ass': None,
+        'd_ass': None,
         'lamb': None,
 
         # Timing & recall settings
@@ -1207,6 +1373,8 @@ def make_default_params():
         omega = 8,
         alpha = 4,
         c_thresh = 0.5,
+        c_thresh_ass = 0.5,
+        d_ass = 1,
         lamb = 0.5,
         gamma_fc = 0.5,
         gamma_cf = 0.5,
@@ -1510,7 +1678,7 @@ def run_norm_recog_multi_sess(params, df_study, df_test, sem_mat, source_mat=Non
 
     return df_thin
 
-def run_conti_recog_multi_sess(params, df, sem_mat, source_mat=None, task='Recog', mode='Continuous'):
+def run_conti_recog_multi_sess(params, df, sem_mat, source_mat=None, task='Recog', mode='Final'):
     """
     Simulates multiple sessions of continuous recognition using a single set of parameters.
     [Newly added by Beige]
@@ -1567,3 +1735,121 @@ def run_conti_recog_multi_sess(params, df, sem_mat, source_mat=None, task='Recog
     print("CMR Time: " + str(time.time() - now_test))
 
     return df_thin
+
+def run_hockley_recog_multi_sess(params, df, sem_mat, source_mat=None, task='Recog', mode='Hockley'):
+    """
+    Simulates multiple sessions of continuous recognition using a single set of parameters.
+    [Newly added by Beige]
+
+    :param params: A dictionary of model parameters and settings to use for the
+        simulation. Call the CMR_IA.make_params() function to get a
+        dictionary template you can fill in with your desired values.
+    :param df: A dataframe of experiment design. This dataframe should have these
+        3 columns: "session", "position", "itemno". Each row corresponds to a trial.
+        "session" specifies the session, "position" specifies the sequence of items
+        within a session, and "itemno" specifies which item is presented. "itemno" should
+        correspond to sem_mat.
+    :param sem_mat: A 2D array containing the pairwise semantic similarities between all
+        words in the word pool. The ordering of words in the similarity matrix must
+        match the word ID numbers, such that the scores for word k must be located along
+        row k-1 and column k-1.
+    :param source_mat: If None, source coding will not be used. Otherwise, source_mat
+        should be a 3D array containing source features for each presented word. The
+        matrix should have one row for each trial and one column for each serial
+        position, with the third dimension having length equal to the number of source
+        features you wish to simulate. Cell (i, j, k) should contain the value of the
+        kth source feature of the jth item presented on list i. (DEFAULT=None)
+    :param task: Recognition. (DEFAULT='Recog')
+    :param mode: A string indicating the type of free recall to simulate. Set to 'Continuous'
+        for continuous recognition. (DEFUALT='Continuous')
+
+    :returns: A dataframe with 6 columns: "session", "position", "itemno", "s_resp", "s_rt", "csim".
+        The first three columns are identical to those in input df. The last three columns
+        indicates the simulated response, reaction time and context similarity respectively.
+    """
+    now_test = time.time()
+
+    sessions = np.unique(df.session)
+    df_thin = df[['session','position','study_itemno1','study_itemno2','test_itemno1','test_itemno2']]
+    df_thin = df_thin.assign(s_resp=np.nan, s_rt=np.nan, csim=np.nan)
+
+    for sess in sessions:
+        # extarct the session data
+        pres_mat = df_thin.loc[df_thin.session == sess, ['study_itemno1', 'study_itemno2']].to_numpy()
+        pres_mat = np.reshape(pres_mat, (len(pres_mat), 1, 2))
+        cue_mat = df_thin.loc[df_thin.session == sess, ['test_itemno1', 'test_itemno2']].to_numpy()
+
+        # run CMR for each session
+        cmr = CMR2(params, pres_mat, sem_mat, source_mat=None,
+                   rec_mat=None, ffr_mat=None, cue_mat=cue_mat, task=task, mode=mode)
+        cmr.run_hockley_recog_single_sess()
+
+        recs = cmr.rec_items
+        rts = cmr.rec_times
+        csims = cmr.recog_similarity
+        result = np.column_stack((recs,rts,csims))
+
+        df_thin.loc[df_thin.session==sess, ['s_resp','s_rt','csim']] = result
+
+    print("CMR Time: " + str(time.time() - now_test))
+
+    return df_thin
+
+def run_norm_cr_multi_sess(params, df_study, df_test, sem_mat, source_mat=None, task='CR', mode='Final'):
+    """
+    Simulates multiple sessions of continuous recognition using a single set of parameters.
+    [Newly added by Beige]
+
+    :param params: A dictionary of model parameters and settings to use for the
+        simulation. Call the CMR_IA.make_params() function to get a
+        dictionary template you can fill in with your desired values.
+    :param df: A dataframe of experiment design. This dataframe should have these
+        3 columns: "session", "position", "itemno". Each row corresponds to a trial.
+        "session" specifies the session, "position" specifies the sequence of items
+        within a session, and "itemno" specifies which item is presented. "itemno" should
+        correspond to sem_mat.
+    :param sem_mat: A 2D array containing the pairwise semantic similarities between all
+        words in the word pool. The ordering of words in the similarity matrix must
+        match the word ID numbers, such that the scores for word k must be located along
+        row k-1 and column k-1.
+    :param source_mat: If None, source coding will not be used. Otherwise, source_mat
+        should be a 3D array containing source features for each presented word. The
+        matrix should have one row for each trial and one column for each serial
+        position, with the third dimension having length equal to the number of source
+        features you wish to simulate. Cell (i, j, k) should contain the value of the
+        kth source feature of the jth item presented on list i. (DEFAULT=None)
+    :param task: Recognition. (DEFAULT='Recog')
+    :param mode: A string indicating the type of free recall to simulate. Set to 'Continuous'
+        for continuous recognition. (DEFUALT='Continuous')
+
+    :returns: A dataframe with 6 columns: "session", "position", "itemno", "s_resp", "s_rt", "csim".
+        The first three columns are identical to those in input df. The last three columns
+        indicates the simulated response, reaction time and context similarity respectively.
+    """
+    now_test = time.time()
+
+    sessions = np.unique(df_study.session)
+    df_thin = df_test[['session','test_itemno']]
+    df_thin = df_thin.assign(s_resp=np.nan, s_rt=np.nan)
+    f_in = []
+
+    for sess in sessions:
+        # extarct the session data
+        pres_mat = df_study.loc[df_study.session == sess, ['study_itemno1', 'study_itemno2']].to_numpy()
+        pres_mat = np.reshape(pres_mat, (1, len(pres_mat), 2))
+        cue_mat = df_thin.loc[df_thin.session == sess, 'test_itemno'].to_numpy()
+
+        # run CMR for each session
+        cmr = CMR2(params, pres_mat, sem_mat, source_mat=None,
+                   rec_mat=None, ffr_mat=None, cue_mat=cue_mat, task=task, mode=mode)
+        cmr.run_norm_cr_single_sess()
+
+        recs = cmr.rec_items
+        rts = cmr.rec_times
+        result = np.column_stack((recs,rts))
+        df_thin.loc[df_thin.session==sess, ['s_resp','s_rt']] = result
+        f_in.append(cmr.f_in) # only for testing
+
+    print("CMR Time: " + str(time.time() - now_test))
+
+    return df_thin, f_in
