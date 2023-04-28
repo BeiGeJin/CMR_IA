@@ -227,6 +227,7 @@ class CMR2(object):
         self.att_vec = self.params['m'] * self.sem_mean + self.params['n']
         self.att_vec[self.att_vec > 1/self.params['gamma_fc']] = 1/self.params['gamma_fc']
         self.att_vec[self.att_vec < 0] = 0
+        self.c_vec = self.params['c1'] * self.sem_mean + self.params['c_thresh']
 
         # extract model-calculated word frequency
         self.b0 = 6.8657
@@ -347,6 +348,9 @@ class CMR2(object):
         self.serial_position = 0  # Current serial position (0-indexed)
         self.distractor_idx = self.nitems_unique  # Current distractor index
         self.first_source_idx = self.ntemporal  # Index of the first source feature
+
+        # for test
+        self.f_in_acc = []
 
     def run_fr_trial(self):
         """
@@ -851,14 +855,19 @@ class CMR2(object):
                     # Simulate cued recall
                     #####
                     # print(self.phase)
-                    self.beta = self.params['beta_rec']
-                    self.beta_source = 0
-                    cue_idx = self.cues_indexes[trial_idx]
-                    # print("before cue:\n",self.c)
-                    # print(cue_idx)
-                    self.simulate_cr(cue_idx)
-                    # print("recog c_old:\n", self.c_old) #
-                    # print("recog c_in:\n", self.c_in)  #
+                    cue_cnt = 0
+                    for cue_idx in self.cues_indexes:
+                        self.beta = self.params['beta_rec']
+                        self.beta_source = 0
+                        # cue_idx = self.cues_indexes[trial_idx]
+                        # print("before cue:\n",self.c)
+                        # print(cue_idx)
+                        self.simulate_cr(cue_idx)
+                        cue_cnt += 1
+                        if cue_cnt == len(self.cues_indexes)/2: # reset threshold when test2
+                            self.ret_thresh = np.ones(self.nitems_unique, dtype=np.float32)
+                        # print("recog c_old:\n", self.c_old) #
+                        # print("recog c_in:\n", self.c_in)  #
 
     def present_item(self, item_idx, source=None, update_context=True, update_weights=True):
         """
@@ -1058,7 +1067,11 @@ class CMR2(object):
         self.recog_similarity.append(c_similarity.item())
         self.rec_times.append(rt.item())
 
-        thresh = self.params['c_thresh'] if not paired_cue else self.params['c_thresh_ass']
+        if paired_cue:
+            thresh = self.params['c_thresh_ass']
+        else:
+            thresh = self.c_vec[self.all_nos_unique[cue_idx] - 1]
+        # thresh = self.params['c_thresh'] if not paired_cue else self.params['c_thresh_ass']
         if c_similarity >= thresh:
             self.rec_items.append(1)  # YES
         else:
@@ -1084,7 +1097,8 @@ class CMR2(object):
 
         # Use context to cue items
         f_in = np.dot(self.M_CF, self.c)[:self.nitems_unique].flatten()
-        self.f_in = f_in
+        self.f_in = f_in # for test
+        self.f_in_acc.append(f_in) # for test
         # print("recall", cue_idx, "f_in:\n", f_in)
 
         # Identify set of items with the highest activation
@@ -1130,7 +1144,7 @@ class CMR2(object):
 
         else:
             self.rec_items.append(-1) # fail
-            self.rec_times.append(-1)
+            self.rec_times.append(-1) 
 
     def diffusion(self, c1, c2,max_time=5000):
         """
@@ -1327,6 +1341,9 @@ def make_params(source_coding=False):
         # [bj] Elevated-attention parameters for WFE
         'm': None,
         'n': None,
+
+        # [bj] Criterion-shift parameters for WFE
+        'c1':None,
     }
 
     # If not using source coding, set up 2 associative scaling parameters (gamma)
@@ -1381,7 +1398,8 @@ def make_default_params():
         a = 2800,
         b = 20,
         m = 0,
-        n = 0
+        n = 1,
+        c1 = 0,
     )
 
     return param_dict
@@ -1848,7 +1866,8 @@ def run_norm_cr_multi_sess(params, df_study, df_test, sem_mat, source_mat=None, 
         rts = cmr.rec_times
         result = np.column_stack((recs,rts))
         df_thin.loc[df_thin.session==sess, ['s_resp','s_rt']] = result
-        f_in.append(cmr.f_in) # only for testing
+        # f_in.append(cmr.f_in) # only for testing
+        f_in.append(cmr.f_in_acc)
 
     print("CMR Time: " + str(time.time() - now_test))
 
