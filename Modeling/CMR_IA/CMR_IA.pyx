@@ -1091,7 +1091,7 @@ class CMR2(object):
 
         # present cue and update the context
         self.present_item(cue_idx, source=None, update_context=True, update_weights=False)
-        self.ret_thresh[cue_idx] = np.inf # can't recall the cue!
+        self.ret_thresh[cue_idx] = 1 + self.params['omega'] # can't recall the cue!
         # print("c_in\n:", self.c_in)
         # print("after cue\n:", self.c)
 
@@ -1120,19 +1120,60 @@ class CMR2(object):
             # Identify the feature index of the retrieved item
             item = top_items[winner_idx]
 
+            # Decay retrieval thresholds            
+            self.ret_thresh = 1 + self.params['alpha'] * (self.ret_thresh - 1)
+
+            # Present retrieved item to the model, with no source information
+            self.beta = self.params['beta_rec_new']
+            self.present_item(item, source=None, update_context=True, update_weights=False)
+
+            # Filter intrusions using temporal context comparison, and log item if overtly recalled
+            c_similarity = np.dot(self.c_old[:self.ntemporal].T, self.c_in[:self.ntemporal])
+            self.recog_similarity.append(c_similarity.item())
+            if c_similarity >= self.params['c_thresh']:
+
+                # Set the retrieved item's threshold to maximum
+                self.ret_thresh[item] = 1 + self.params['omega']
+
+                # Learn while retrieving
+                if self.learn_while_retrieving:
+                    self.present_item([item,cue_idx], source=None, update_context=False, update_weights=True)
+
+                rec_itemno = self.all_nos_unique[item] #[bj]
+                self.rec_items.append(rec_itemno)
+                self.rec_times.append(cycles_elapsed * self.params['dt'])
+            else:
+                self.rec_items.append(-2) # reject
+                self.rec_times.append(-2)
+
+        else:
+            self.rec_items.append(-1) # fail
+            self.rec_times.append(-1)
+            self.recog_similarity.append(-1)
+
+        '''
+        # Perform the following steps only if an item was retrieved
+        if winner_idx != -1:
+
+            # Identify the feature index of the retrieved item
+            item = top_items[winner_idx]
+
             # Decay retrieval thresholds, then set the retrieved item's threshold to maximum
             self.ret_thresh = 1 + self.params['alpha'] * (self.ret_thresh - 1)
             self.ret_thresh[item] = 1 + self.params['omega']
-            self.ret_thresh[cue_idx] = 1 # back to norm
+            # self.ret_thresh[cue_idx] = 1 # back to norm
 
             # Present retrieved item to the model, with no source information
             if self.learn_while_retrieving:
-                self.present_item(item, source=None, update_context=True, update_weights=True)
+                # self.present_item(item, source=None, update_context=True, update_weights=True)
+                self.present_item(item, source=None, update_context=True, update_weights=False)
+                self.present_item([item,cue_idx], source=None, update_context=False, update_weights=True)
             else:
                 self.present_item(item, source=None, update_context=True, update_weights=False)
 
             # Filter intrusions using temporal context comparison, and log item if overtly recalled
             c_similarity = np.dot(self.c_old[:self.ntemporal].T, self.c_in[:self.ntemporal])
+            self.recog_similarity.append(c_similarity.item())
             if c_similarity >= self.params['c_thresh']:
                 # print("recall", cue_idx, "recall item index:\n", item)
                 rec_itemno = self.all_nos_unique[item] #[bj]
@@ -1144,7 +1185,9 @@ class CMR2(object):
 
         else:
             self.rec_items.append(-1) # fail
-            self.rec_times.append(-1) 
+            self.rec_times.append(-1)
+            self.recog_similarity.append(-1)
+        '''
 
     def diffusion(self, c1, c2,max_time=5000):
         """
@@ -1864,11 +1907,12 @@ def run_norm_cr_multi_sess(params, df_study, df_test, sem_mat, source_mat=None, 
 
         recs = cmr.rec_items
         rts = cmr.rec_times
-        result = np.column_stack((recs,rts))
-        df_thin.loc[df_thin.session==sess, ['s_resp','s_rt']] = result
+        csims = cmr.recog_similarity
+        result = np.column_stack((recs,rts,csims))
+        df_thin.loc[df_thin.session==sess, ['s_resp','s_rt','csim']] = result
         # f_in.append(cmr.f_in) # only for testing
         f_in.append(cmr.f_in_acc)
 
-    print("CMR Time: " + str(time.time() - now_test))
+    print("CMR2 Time: " + str(time.time() - now_test))
 
     return df_thin, f_in

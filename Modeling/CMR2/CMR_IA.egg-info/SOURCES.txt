@@ -1,7 +1,0 @@
-CMR_IA.c
-README.txt
-setup_cmr2.py
-CMR_IA.egg-info/PKG-INFO
-CMR_IA.egg-info/SOURCES.txt
-CMR_IA.egg-info/dependency_links.txt
-CMR_IA.egg-info/top_level.txt
