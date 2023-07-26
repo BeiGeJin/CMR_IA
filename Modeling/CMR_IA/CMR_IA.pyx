@@ -815,7 +815,6 @@ class CMR2(object):
                 self.present_item(self.distractor_idx, source, update_context=True, update_weights=False)
                 self.distractor_idx += 1
                 self.serial_position = 0
-                self.ret_thresh = np.ones(self.nitems_unique, dtype=np.float32)  # reset threshold
 
             if self.phase == 'prerecall':
                 #####
@@ -825,6 +824,7 @@ class CMR2(object):
                 self.beta_source = self.params['beta_distract']
                 self.present_item(self.distractor_idx, source, update_context=True, update_weights=False)
                 self.distractor_idx += 1
+                self.ret_thresh = np.ones(self.nitems_unique, dtype=np.float32)  # reset threshold
 
             if self.phase == 'encoding':
                 #####
