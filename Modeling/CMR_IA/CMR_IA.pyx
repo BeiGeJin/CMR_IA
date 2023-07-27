@@ -1137,7 +1137,7 @@ class CMR2(object):
             self.ret_thresh = 1 + self.params['alpha'] * (self.ret_thresh - 1)
 
             # Present retrieved item to the model, with no source information
-            self.beta = self.params['beta_rec_new']
+            self.beta = self.params['beta_rec']
             self.present_item(item, source=None, update_context=True, update_weights=False)
 
             # Filter intrusions using temporal context comparison, and log item if overtly recalled
@@ -1331,7 +1331,7 @@ def make_params(source_coding=False):
         'beta_enc': None,  # Beta encoding
         'beta_rec': None,  # Beta recall
         'beta_cue': None,  # [beige] Beta for cue
-        'beta_rec_new': None, # [beige] Beta recall for new items??
+        # 'beta_rec_new': None, # [beige] Beta recall for new items??
         'beta_rec_post': None,  # Beta post-recall
         'beta_distract': None,  # Beta for distractor task
 
@@ -1411,7 +1411,7 @@ def make_default_params():
         beta_enc = 0.5,
         beta_rec = 0.5,
         beta_cue = 0.5,
-        beta_rec_new = 0.5,
+        # beta_rec_new = 0.5,
         beta_rec_post = 0.5,
         phi_s = 2,
         phi_d = 0.5,

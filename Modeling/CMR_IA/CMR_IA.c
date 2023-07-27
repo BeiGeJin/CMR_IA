@@ -2964,7 +2964,6 @@ static const char __pyx_k_recognition[] = "recognition";
 static const char __pyx_k_simulate_cr[] = "simulate_cr";
 static const char __pyx_k_test_itemno[] = "test_itemno";
 static const char __pyx_k_Simultaneous[] = "Simultaneous";
-static const char __pyx_k_beta_rec_new[] = "beta_rec_new";
 static const char __pyx_k_c_similarity[] = "c_similarity";
 static const char __pyx_k_c_thresh_ass[] = "c_thresh_ass";
 static const char __pyx_k_change_state[] = "change_state";
@@ -3201,7 +3200,6 @@ static PyObject *__pyx_n_s_beta_cue;
 static PyObject *__pyx_n_s_beta_distract;
 static PyObject *__pyx_n_s_beta_enc;
 static PyObject *__pyx_n_s_beta_rec;
-static PyObject *__pyx_n_s_beta_rec_new;
 static PyObject *__pyx_n_s_beta_rec_post;
 static PyObject *__pyx_n_s_beta_source;
 static PyObject *__pyx_n_s_beta_vec;
@@ -17499,13 +17497,13 @@ static PyObject *__pyx_pf_6CMR_IA_4CMR2_18simulate_cr(CYTHON_UNUSED PyObject *__
     /* "CMR_IA.pyx":1140
  * 
  *             # Present retrieved item to the model, with no source information
- *             self.beta = self.params['beta_rec_new']             # <<<<<<<<<<<<<<
+ *             self.beta = self.params['beta_rec']             # <<<<<<<<<<<<<<
  *             self.present_item(item, source=None, update_context=True, update_weights=False)
  * 
  */
     __pyx_t_4 = __Pyx_PyObject_GetAttrStr(__pyx_v_self, __pyx_n_s_params); if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1140, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_4);
-    __pyx_t_2 = __Pyx_PyObject_Dict_GetItem(__pyx_t_4, __pyx_n_s_beta_rec_new); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1140, __pyx_L1_error)
+    __pyx_t_2 = __Pyx_PyObject_Dict_GetItem(__pyx_t_4, __pyx_n_s_beta_rec); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1140, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_2);
     __Pyx_DECREF(__pyx_t_4); __pyx_t_4 = 0;
     if (__Pyx_PyObject_SetAttrStr(__pyx_v_self, __pyx_n_s_beta, __pyx_t_2) < 0) __PYX_ERR(0, 1140, __pyx_L1_error)
@@ -17513,7 +17511,7 @@ static PyObject *__pyx_pf_6CMR_IA_4CMR2_18simulate_cr(CYTHON_UNUSED PyObject *__
 
     /* "CMR_IA.pyx":1141
  *             # Present retrieved item to the model, with no source information
- *             self.beta = self.params['beta_rec_new']
+ *             self.beta = self.params['beta_rec']
  *             self.present_item(item, source=None, update_context=True, update_weights=False)             # <<<<<<<<<<<<<<
  * 
  *             # Filter intrusions using temporal context comparison, and log item if overtly recalled
@@ -19458,7 +19456,7 @@ static PyObject *__pyx_pf_6CMR_IA_make_params(CYTHON_UNUSED PyObject *__pyx_self
  *         'beta_rec': None,  # Beta recall
  *         'beta_cue': None,  # [beige] Beta for cue
  */
-  __pyx_t_1 = __Pyx_PyDict_NewPresized(31); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1331, __pyx_L1_error)
+  __pyx_t_1 = __Pyx_PyDict_NewPresized(30); if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1331, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
   if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_beta_enc, Py_None) < 0) __PYX_ERR(0, 1331, __pyx_L1_error)
 
@@ -19467,7 +19465,7 @@ static PyObject *__pyx_pf_6CMR_IA_make_params(CYTHON_UNUSED PyObject *__pyx_self
  *         'beta_enc': None,  # Beta encoding
  *         'beta_rec': None,  # Beta recall             # <<<<<<<<<<<<<<
  *         'beta_cue': None,  # [beige] Beta for cue
- *         'beta_rec_new': None, # [beige] Beta recall for new items??
+ *         # 'beta_rec_new': None, # [beige] Beta recall for new items??
  */
   if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_beta_rec, Py_None) < 0) __PYX_ERR(0, 1331, __pyx_L1_error)
 
@@ -19475,23 +19473,14 @@ static PyObject *__pyx_pf_6CMR_IA_make_params(CYTHON_UNUSED PyObject *__pyx_self
  *         'beta_enc': None,  # Beta encoding
  *         'beta_rec': None,  # Beta recall
  *         'beta_cue': None,  # [beige] Beta for cue             # <<<<<<<<<<<<<<
- *         'beta_rec_new': None, # [beige] Beta recall for new items??
+ *         # 'beta_rec_new': None, # [beige] Beta recall for new items??
  *         'beta_rec_post': None,  # Beta post-recall
  */
   if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_beta_cue, Py_None) < 0) __PYX_ERR(0, 1331, __pyx_L1_error)
 
-  /* "CMR_IA.pyx":1334
- *         'beta_rec': None,  # Beta recall
- *         'beta_cue': None,  # [beige] Beta for cue
- *         'beta_rec_new': None, # [beige] Beta recall for new items??             # <<<<<<<<<<<<<<
- *         'beta_rec_post': None,  # Beta post-recall
- *         'beta_distract': None,  # Beta for distractor task
- */
-  if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_beta_rec_new, Py_None) < 0) __PYX_ERR(0, 1331, __pyx_L1_error)
-
   /* "CMR_IA.pyx":1335
  *         'beta_cue': None,  # [beige] Beta for cue
- *         'beta_rec_new': None, # [beige] Beta recall for new items??
+ *         # 'beta_rec_new': None, # [beige] Beta recall for new items??
  *         'beta_rec_post': None,  # Beta post-recall             # <<<<<<<<<<<<<<
  *         'beta_distract': None,  # Beta for distractor task
  * 
@@ -19499,7 +19488,7 @@ static PyObject *__pyx_pf_6CMR_IA_make_params(CYTHON_UNUSED PyObject *__pyx_self
   if (PyDict_SetItem(__pyx_t_1, __pyx_n_s_beta_rec_post, Py_None) < 0) __PYX_ERR(0, 1331, __pyx_L1_error)
 
   /* "CMR_IA.pyx":1336
- *         'beta_rec_new': None, # [beige] Beta recall for new items??
+ *         # 'beta_rec_new': None, # [beige] Beta recall for new items??
  *         'beta_rec_post': None,  # Beta post-recall
  *         'beta_distract': None,  # Beta for distractor task             # <<<<<<<<<<<<<<
  * 
@@ -19912,12 +19901,11 @@ static PyObject *__pyx_pf_6CMR_IA_2make_default_params(CYTHON_UNUSED PyObject *_
  *         beta_rec = 0.5,
  *         beta_cue = 0.5,
  */
-  __pyx_t_2 = __Pyx_PyDict_NewPresized(26); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1411, __pyx_L1_error)
+  __pyx_t_2 = __Pyx_PyDict_NewPresized(25); if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1411, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_2);
   if (PyDict_SetItem(__pyx_t_2, __pyx_n_s_beta_enc, __pyx_float_0_5) < 0) __PYX_ERR(0, 1411, __pyx_L1_error)
   if (PyDict_SetItem(__pyx_t_2, __pyx_n_s_beta_rec, __pyx_float_0_5) < 0) __PYX_ERR(0, 1411, __pyx_L1_error)
   if (PyDict_SetItem(__pyx_t_2, __pyx_n_s_beta_cue, __pyx_float_0_5) < 0) __PYX_ERR(0, 1411, __pyx_L1_error)
-  if (PyDict_SetItem(__pyx_t_2, __pyx_n_s_beta_rec_new, __pyx_float_0_5) < 0) __PYX_ERR(0, 1411, __pyx_L1_error)
   if (PyDict_SetItem(__pyx_t_2, __pyx_n_s_beta_rec_post, __pyx_float_0_5) < 0) __PYX_ERR(0, 1411, __pyx_L1_error)
   if (PyDict_SetItem(__pyx_t_2, __pyx_n_s_phi_s, __pyx_int_2) < 0) __PYX_ERR(0, 1411, __pyx_L1_error)
   if (PyDict_SetItem(__pyx_t_2, __pyx_n_s_phi_d, __pyx_float_0_5) < 0) __PYX_ERR(0, 1411, __pyx_L1_error)
@@ -40924,7 +40912,6 @@ static __Pyx_StringTabEntry __pyx_string_tab[] = {
   {&__pyx_n_s_beta_distract, __pyx_k_beta_distract, sizeof(__pyx_k_beta_distract), 0, 0, 1, 1},
   {&__pyx_n_s_beta_enc, __pyx_k_beta_enc, sizeof(__pyx_k_beta_enc), 0, 0, 1, 1},
   {&__pyx_n_s_beta_rec, __pyx_k_beta_rec, sizeof(__pyx_k_beta_rec), 0, 0, 1, 1},
-  {&__pyx_n_s_beta_rec_new, __pyx_k_beta_rec_new, sizeof(__pyx_k_beta_rec_new), 0, 0, 1, 1},
   {&__pyx_n_s_beta_rec_post, __pyx_k_beta_rec_post, sizeof(__pyx_k_beta_rec_post), 0, 0, 1, 1},
   {&__pyx_n_s_beta_source, __pyx_k_beta_source, sizeof(__pyx_k_beta_source), 0, 0, 1, 1},
   {&__pyx_n_s_beta_vec, __pyx_k_beta_vec, sizeof(__pyx_k_beta_vec), 0, 0, 1, 1},

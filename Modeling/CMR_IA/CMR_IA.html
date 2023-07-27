@@ -10717,10 +10717,10 @@ static PyObject *__pyx_pf_6CMR_IA_4CMR2_18simulate_cr(CYTHON_UNUSED PyObject *__
     <span class='pyx_macro_api'>__Pyx_DECREF</span>(__pyx_t_4); __pyx_t_4 = 0;
 </pre><pre class="cython line score-0">&#xA0;<span class="">1138</span>: </pre>
 <pre class="cython line score-0">&#xA0;<span class="">1139</span>:             <span class="c"># Present retrieved item to the model, with no source information</span></pre>
-<pre class="cython line score-8" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1140</span>:             <span class="bp">self</span><span class="o">.</span><span class="n">beta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="s">&#39;beta_rec_new&#39;</span><span class="p">]</span></pre>
+<pre class="cython line score-8" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1140</span>:             <span class="bp">self</span><span class="o">.</span><span class="n">beta</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">params</span><span class="p">[</span><span class="s">&#39;beta_rec&#39;</span><span class="p">]</span></pre>
 <pre class='cython code score-8 '>    __pyx_t_4 = <span class='pyx_c_api'>__Pyx_PyObject_GetAttrStr</span>(__pyx_v_self, __pyx_n_s_params);<span class='error_goto'> if (unlikely(!__pyx_t_4)) __PYX_ERR(0, 1140, __pyx_L1_error)</span>
     <span class='refnanny'>__Pyx_GOTREF</span>(__pyx_t_4);
-    __pyx_t_2 = <span class='pyx_c_api'>__Pyx_PyObject_Dict_GetItem</span>(__pyx_t_4, __pyx_n_s_beta_rec_new);<span class='error_goto'> if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1140, __pyx_L1_error)</span>
+    __pyx_t_2 = <span class='pyx_c_api'>__Pyx_PyObject_Dict_GetItem</span>(__pyx_t_4, __pyx_n_s_beta_rec);<span class='error_goto'> if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1140, __pyx_L1_error)</span>
     <span class='refnanny'>__Pyx_GOTREF</span>(__pyx_t_2);
     <span class='pyx_macro_api'>__Pyx_DECREF</span>(__pyx_t_4); __pyx_t_4 = 0;
     if (<span class='pyx_c_api'>__Pyx_PyObject_SetAttrStr</span>(__pyx_v_self, __pyx_n_s_beta, __pyx_t_2) &lt; 0) <span class='error_goto'>__PYX_ERR(0, 1140, __pyx_L1_error)</span>
@@ -12008,16 +12008,15 @@ static PyObject *__pyx_pf_6CMR_IA_make_params(CYTHON_UNUSED PyObject *__pyx_self
 <pre class="cython line score-0">&#xA0;<span class="">1329</span>:     <span class="n">param_dict</span> <span class="o">=</span> <span class="p">{</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1330</span>:         <span class="c"># Beta parameters</span></pre>
 <pre class="cython line score-7" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1331</span>:         <span class="s">&#39;beta_enc&#39;</span><span class="p">:</span> <span class="bp">None</span><span class="p">,</span>  <span class="c"># Beta encoding</span></pre>
-<pre class='cython code score-7 '>  __pyx_t_1 = <span class='pyx_c_api'>__Pyx_PyDict_NewPresized</span>(31);<span class='error_goto'> if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1331, __pyx_L1_error)</span>
+<pre class='cython code score-7 '>  __pyx_t_1 = <span class='pyx_c_api'>__Pyx_PyDict_NewPresized</span>(30);<span class='error_goto'> if (unlikely(!__pyx_t_1)) __PYX_ERR(0, 1331, __pyx_L1_error)</span>
   <span class='refnanny'>__Pyx_GOTREF</span>(__pyx_t_1);
   if (<span class='py_c_api'>PyDict_SetItem</span>(__pyx_t_1, __pyx_n_s_beta_enc, Py_None) &lt; 0) <span class='error_goto'>__PYX_ERR(0, 1331, __pyx_L1_error)</span>
 </pre><pre class="cython line score-5" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1332</span>:         <span class="s">&#39;beta_rec&#39;</span><span class="p">:</span> <span class="bp">None</span><span class="p">,</span>  <span class="c"># Beta recall</span></pre>
 <pre class='cython code score-5 '>  if (<span class='py_c_api'>PyDict_SetItem</span>(__pyx_t_1, __pyx_n_s_beta_rec, Py_None) &lt; 0) <span class='error_goto'>__PYX_ERR(0, 1331, __pyx_L1_error)</span>
 </pre><pre class="cython line score-5" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1333</span>:         <span class="s">&#39;beta_cue&#39;</span><span class="p">:</span> <span class="bp">None</span><span class="p">,</span>  <span class="c"># [beige] Beta for cue</span></pre>
 <pre class='cython code score-5 '>  if (<span class='py_c_api'>PyDict_SetItem</span>(__pyx_t_1, __pyx_n_s_beta_cue, Py_None) &lt; 0) <span class='error_goto'>__PYX_ERR(0, 1331, __pyx_L1_error)</span>
-</pre><pre class="cython line score-5" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1334</span>:         <span class="s">&#39;beta_rec_new&#39;</span><span class="p">:</span> <span class="bp">None</span><span class="p">,</span> <span class="c"># [beige] Beta recall for new items??</span></pre>
-<pre class='cython code score-5 '>  if (<span class='py_c_api'>PyDict_SetItem</span>(__pyx_t_1, __pyx_n_s_beta_rec_new, Py_None) &lt; 0) <span class='error_goto'>__PYX_ERR(0, 1331, __pyx_L1_error)</span>
-</pre><pre class="cython line score-5" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1335</span>:         <span class="s">&#39;beta_rec_post&#39;</span><span class="p">:</span> <span class="bp">None</span><span class="p">,</span>  <span class="c"># Beta post-recall</span></pre>
+</pre><pre class="cython line score-0">&#xA0;<span class="">1334</span>:         <span class="c"># &#39;beta_rec_new&#39;: None, # [beige] Beta recall for new items??</span></pre>
+<pre class="cython line score-5" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1335</span>:         <span class="s">&#39;beta_rec_post&#39;</span><span class="p">:</span> <span class="bp">None</span><span class="p">,</span>  <span class="c"># Beta post-recall</span></pre>
 <pre class='cython code score-5 '>  if (<span class='py_c_api'>PyDict_SetItem</span>(__pyx_t_1, __pyx_n_s_beta_rec_post, Py_None) &lt; 0) <span class='error_goto'>__PYX_ERR(0, 1331, __pyx_L1_error)</span>
 </pre><pre class="cython line score-5" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1336</span>:         <span class="s">&#39;beta_distract&#39;</span><span class="p">:</span> <span class="bp">None</span><span class="p">,</span>  <span class="c"># Beta for distractor task</span></pre>
 <pre class='cython code score-5 '>  if (<span class='py_c_api'>PyDict_SetItem</span>(__pyx_t_1, __pyx_n_s_beta_distract, Py_None) &lt; 0) <span class='error_goto'>__PYX_ERR(0, 1331, __pyx_L1_error)</span>
@@ -12217,13 +12216,12 @@ static PyObject *__pyx_pf_6CMR_IA_2make_default_params(CYTHON_UNUSED PyObject *_
   <span class='pyx_macro_api'>__Pyx_DECREF</span>(__pyx_t_1); __pyx_t_1 = 0;
   <span class='pyx_macro_api'>__Pyx_DECREF</span>(__pyx_t_2); __pyx_t_2 = 0;
   <span class='pyx_macro_api'>__Pyx_DECREF</span>(__pyx_t_3); __pyx_t_3 = 0;
-</pre><pre class="cython line score-132" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1411</span>:         <span class="n">beta_enc</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span></pre>
-<pre class='cython code score-132 '>  __pyx_t_2 = <span class='pyx_c_api'>__Pyx_PyDict_NewPresized</span>(26);<span class='error_goto'> if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1411, __pyx_L1_error)</span>
+</pre><pre class="cython line score-127" onclick="(function(s){s.display=s.display==='block'?'none':'block'})(this.nextElementSibling.style)">+<span class="">1411</span>:         <span class="n">beta_enc</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span></pre>
+<pre class='cython code score-127 '>  __pyx_t_2 = <span class='pyx_c_api'>__Pyx_PyDict_NewPresized</span>(25);<span class='error_goto'> if (unlikely(!__pyx_t_2)) __PYX_ERR(0, 1411, __pyx_L1_error)</span>
   <span class='refnanny'>__Pyx_GOTREF</span>(__pyx_t_2);
   if (<span class='py_c_api'>PyDict_SetItem</span>(__pyx_t_2, __pyx_n_s_beta_enc, __pyx_float_0_5) &lt; 0) <span class='error_goto'>__PYX_ERR(0, 1411, __pyx_L1_error)</span>
   if (<span class='py_c_api'>PyDict_SetItem</span>(__pyx_t_2, __pyx_n_s_beta_rec, __pyx_float_0_5) &lt; 0) <span class='error_goto'>__PYX_ERR(0, 1411, __pyx_L1_error)</span>
   if (<span class='py_c_api'>PyDict_SetItem</span>(__pyx_t_2, __pyx_n_s_beta_cue, __pyx_float_0_5) &lt; 0) <span class='error_goto'>__PYX_ERR(0, 1411, __pyx_L1_error)</span>
-  if (<span class='py_c_api'>PyDict_SetItem</span>(__pyx_t_2, __pyx_n_s_beta_rec_new, __pyx_float_0_5) &lt; 0) <span class='error_goto'>__PYX_ERR(0, 1411, __pyx_L1_error)</span>
   if (<span class='py_c_api'>PyDict_SetItem</span>(__pyx_t_2, __pyx_n_s_beta_rec_post, __pyx_float_0_5) &lt; 0) <span class='error_goto'>__PYX_ERR(0, 1411, __pyx_L1_error)</span>
   if (<span class='py_c_api'>PyDict_SetItem</span>(__pyx_t_2, __pyx_n_s_phi_s, __pyx_int_2) &lt; 0) <span class='error_goto'>__PYX_ERR(0, 1411, __pyx_L1_error)</span>
   if (<span class='py_c_api'>PyDict_SetItem</span>(__pyx_t_2, __pyx_n_s_phi_d, __pyx_float_0_5) &lt; 0) <span class='error_goto'>__PYX_ERR(0, 1411, __pyx_L1_error)</span>
@@ -12248,7 +12246,7 @@ static PyObject *__pyx_pf_6CMR_IA_2make_default_params(CYTHON_UNUSED PyObject *_
   if (<span class='py_c_api'>PyDict_SetItem</span>(__pyx_t_2, __pyx_n_s_bad_enc_ratio, __pyx_int_1) &lt; 0) <span class='error_goto'>__PYX_ERR(0, 1411, __pyx_L1_error)</span>
 </pre><pre class="cython line score-0">&#xA0;<span class="">1412</span>:         <span class="n">beta_rec</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1413</span>:         <span class="n">beta_cue</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span></pre>
-<pre class="cython line score-0">&#xA0;<span class="">1414</span>:         <span class="n">beta_rec_new</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span></pre>
+<pre class="cython line score-0">&#xA0;<span class="">1414</span>:         <span class="c"># beta_rec_new = 0.5,</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1415</span>:         <span class="n">beta_rec_post</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1416</span>:         <span class="n">phi_s</span> <span class="o">=</span> <span class="mf">2</span><span class="p">,</span></pre>
 <pre class="cython line score-0">&#xA0;<span class="">1417</span>:         <span class="n">phi_d</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span></pre>
