@@ -1,0 +1,358 @@
+import numpy as np
+import scipy.stats as ss
+import CMR_IA as cmr
+import time
+import pandas as pd
+import math
+import pickle
+from optimization_utils import param_vec_to_dict
+
+def obj_func_S1(param_vec, df_study, df_test, sem_mat, sources, return_df=False):
+    
+    # Reformat parameter vector to the dictionary format expected by CMR2
+    param_dict = param_vec_to_dict(param_vec, sim_name = 'S1')
+    stats = []
+
+    for i in [1,2,3]:
+        # Separate 3 groups of simulation
+        df_study_gp = df_study.query(f"group == {i}").copy()
+        df_test_gp = df_test.query(f"group == {i}").copy()
+
+        if i == 1:  # asso-CR
+            nitems = 96
+            test1_num = 40
+        elif i == 2:  # pair-CR
+            nitems = 176
+            test1_num = 80
+        elif i == 3:  # item-CR
+            nitems = 136
+            test1_num = 80
+
+        # Run model with the parameters given in param_vec
+        param_dict.update(nitems_in_accumulator = nitems)
+        df_simu, _, _ = cmr.run_success_multi_sess(param_dict, df_study_gp, df_test_gp, sem_mat)
+        # print(df_simu)
+        # print(df_test_gp)
+        df_simu['test'] = df_test_gp['test']
+        df_simu = df_simu.merge(df_test_gp,on=['session','test','test_itemno1','test_itemno2'])
+
+        # Get behavioral stats
+        subjects = np.unique(df_simu.subject)
+        stats_gp = []
+        for subj in subjects:
+            df_subj = df_simu.query(f"subject == {subj}").copy()
+            stats_gp.append(list(anal_perform_S1(df_subj)))
+        stats_mean = np.mean(stats_gp, axis=0)
+        stats.append(list(stats_mean))
+    
+    # Score the model's behavioral stats as compared with the true data    
+    stats = np.array(stats)
+    ground_truth = np.array([[0.42, 0.72, 0.22, 0.81], [0.30, 0.80, 0.12, 0.71], [0.19, 0.67, 0.15, 0.57]])  # p_rc, hr, far, q
+    err = np.mean(np.power(stats - ground_truth,2))
+    
+    cmr_stats = {}
+    cmr_stats['err'] = err
+    cmr_stats['params'] = param_vec
+    cmr_stats['stats'] = stats
+    
+    if return_df:
+        return err, cmr_stats, df_simu
+    else:
+        return err, cmr_stats
+
+
+def anal_perform_S1(df_simu):
+
+    # get correctness
+    df_simu['correct'] = df_simu.s_resp == df_simu.correct_ans
+
+    # recognition performance
+    df_recog = df_simu.query("test==1")
+    hr_far = df_recog.groupby("correct_ans")["s_resp"].mean().to_frame(name="Yes rate")
+    hr = hr_far['Yes rate'][1]
+    far = hr_far['Yes rate'][0]
+    # print("recognition: \n", hr_far)
+
+    # cued recall performance
+    df_cr = df_simu.query("test==2")
+    p_rc = df_cr.correct.mean()
+    # print("cued recall: \n", p_rc)
+
+    # analyze pair
+    def get_pair(df_tmp):
+        df_tmp_pair = pd.pivot_table(df_tmp,index="pair_idx",columns="test",values="correct")
+        df_tmp_pair.columns = ["test1","test2"]
+        df_tmp_pair.reset_index(inplace=True)
+        return df_tmp_pair
+    df_simu_p = df_simu.query("pair_idx >= 0")
+    df_pair = df_simu_p.groupby("session").apply(get_pair).reset_index()
+    test2_rsp = pd.Categorical(df_pair.test2, categories=[0,1])
+    test1_rsp = pd.Categorical(df_pair.test1, categories=[0,1])
+    df_tab = pd.crosstab(index=test2_rsp,columns=test1_rsp, rownames=['test2'], colnames=['test1'], normalize=False, dropna=False)
+    # print("contingency table: \n", df_tab)
+
+    # compute" Q
+    def Yule_Q(A, B, C, D):
+        return (A * D - B * C) / (A * D + B * C)
+    q = Yule_Q(df_tab[1][1]+0.5,df_tab[0][1]+0.5,df_tab[1][0]+0.5,df_tab[0][0]+0.5)  # add 0.5
+    # print("Q: ", q)
+
+    return p_rc, hr, far, q
+
+
+# def obj_func(param_vec, df, w2v, sources, return_recalls=False, mode='RT_score'):
+    
+#     # Reformat parameter vector to the dictionary format expected by CMR2
+#     param_dict = param_vec_to_dict(param_vec)
+    
+#     # Run model with the parameters given in param_vec
+#     df_simu = cmr.run_continuous_recog_multi_sess(param_dict, df, w2v)
+#     df_simu = df_simu.merge(df, on=['session','position','itemno'])
+    
+#     # Score the model's behavioral stats as compared with the true data    
+#     if mode == 'McNemar':
+#         err = McNemar_chi_square(df_simu, 'yes', 's_resp')
+#     elif mode == 'Deviance':
+#         err = mean_deviance(df_simu, 'yes', 's_resp')
+#     elif mode == 'Logit':
+#         err = logit_negloglikelihood(df_simu, 'yes', 'csim')
+#     elif mode == 'HitFa':
+#         err = hit_fa(df_simu, 'yes', 's_resp')
+#     elif mode == 'chi_squared':
+#         err = chi_squared(df_simu, 'yes', 's_resp')
+#     elif mode == 'ML':
+#         mu, sig, err = twopeak_mle(df_simu)
+#     elif mode == 'RT':
+#         err = rt_rmse(df_simu)
+#     elif mode == 'RT_score':
+#         err = rt_score(df_simu)
+    
+#     cmr_stats = {}
+#     cmr_stats['err'] = err
+#     cmr_stats['params'] = param_vec
+    
+#     if mode == 'ML':
+#         cmr_stats['curve'] = (mu, sig)
+    
+#     if return_recalls:
+#         return err, cmr_stats, df_simu
+#     else:
+#         return err, cmr_stats
+
+# def McNemar_chi_square(df, target_col, cmr_col):
+    
+#     cont_table = pd.crosstab(df[target_col], df[cmr_col])
+    
+#     if cont_table.shape != (2,2):
+#         return np.nan_to_num(np.inf)
+    
+#     else: 
+#         result = mcnemar(cont_table, exact=False)
+#         chi2_err = result.statistic
+
+#         if math.isinf(chi2_err):
+#             chi2_err = 0
+
+#         return chi2_err
+
+# def mean_deviance(df, target_col, cmr_col):
+    
+#     md = (df[target_col] - df[cmr_col]).abs().mean(axis=0,skipna=True)
+    
+#     return md
+
+# def logit_negloglikelihood(df, target_col, cmr_col):
+    
+#     try:
+#         formula = target_col + " ~ " + cmr_col
+#         log_reg = logit(formula, data=df).fit()
+#         neg_mll = -log_reg.llf/log_reg.nobs
+
+#         return neg_mll
+    
+#     except:
+        
+#         print("singular?")
+#         with open('df_singular.pkl', 'wb') as outp:
+#             pickle.dump(df, outp, pickle.HIGHEST_PROTOCOL)
+            
+#         return 999999
+    
+# def hit_fa(df, target_col, cmr_col):
+    
+#     df = df.loc[pd.notna(df.yes)].reset_index()
+#     df = df.astype({'yes': 'int32'})
+    
+#     hit_r = df.loc[df.old == True].groupby(['subject_ID'])[target_col].mean().mean()
+#     fa_r = df.loc[df.old == False].groupby(['subject_ID'])[target_col].mean().mean()
+#     hit_s = df.loc[df.old == True][cmr_col].mean()
+#     fa_s = df.loc[df.old == False][cmr_col].mean()
+    
+#     rmse = math.sqrt(((hit_r - hit_s)**2 + (fa_r - fa_s)**2)/2)
+
+#     return rmse
+
+# def chi_squared(df, target_col, cmr_col):
+    
+#     df = df.loc[pd.notna(df.yes)].reset_index()
+#     df = df.astype({'yes': 'int32'})
+    
+#     df = df.loc[df.lag > 0]
+#     df = df.assign(lag_bin = df['lag'] // 10 * 10)
+#     df['log_lag'] = np.log(df['lag'])
+#     df['log_lag_bin'] = pd.cut(df['log_lag'], np.arange(df['log_lag'].max()+1), labels=False, right=False)
+#     df = df.loc[df.log_lag_bin<5]
+#     # df = df.loc[df.lag < 110]
+    
+#     df_laggp = df.groupby(['subject_ID','log_lag_bin'])[target_col].mean()
+    
+#     df_laggp = df_laggp.to_frame(name='hr').reset_index()
+#     df_laggp = df_laggp.groupby(['log_lag_bin']).agg({'hr':['mean','sem']})
+#     df_laggp.columns = df_laggp.columns.to_flat_index().map(lambda x: '_'.join(x))
+#     df_laggp = df_laggp.reset_index()
+    
+#     y = df_laggp['hr_mean'].to_numpy()
+#     y_sem = df_laggp['hr_sem'].to_numpy()
+#     y_hat = df.groupby(['log_lag_bin'])[cmr_col].mean().to_numpy()
+    
+#     chi2_err = np.mean(((y - y_hat) / y_sem) ** 2)
+
+#     return chi2_err
+
+# def gauss_logL(mu, sig, arr):
+    
+#     N = len(arr)
+#     ll = - 0.5 * N * math.log(2*math.pi) - N * math.log(sig) - 0.5 * np.sum((((arr-mu)/sig)**2))
+    
+#     return ll
+
+# def twopeak_logL(params, df):
+    
+#     k = 1
+#     d = k*1.5
+    
+#     mu, sig = params
+    
+#     df_new = df.loc[df.old == False]
+#     csim_new = df_new.csim.to_numpy()
+#     logL = gauss_logL(mu, sig, csim_new)
+    
+#     df_old = df.loc[df.old == True]
+#     csim_old = df_old.csim.to_numpy()
+#     logL += gauss_logL(mu + d*sig, k*sig, csim_old)
+    
+#     return logL
+
+# def twopeak_mle(df):
+    
+#     df = df.loc[pd.notna(df.yes)].reset_index()
+#     df = df.astype({'yes': 'int32'})
+    
+#     res = opt.minimize(
+#         fun=lambda params, df: -twopeak_logL(params, df),
+#         x0=np.array([0.8, 0.8]), args=(df,),bounds = ((0.001,1),(0.001,1)), method='Nelder-Mead')
+    
+#     mu, sig = res.x
+    
+#     return mu, sig, res.fun
+
+# def rt_rmse(df):
+    
+#     df = df.loc[(df.rt < 3000) & (df.rt > 400)]
+#     rmse = np.sqrt(np.mean((df.s_rt - df.rt)**2))
+    
+#     return rmse
+
+# def loftus_masson(df, sub_cols, cond_col, value_col, within_cols=[]):
+    
+#     if not isinstance(sub_cols, list):
+#         sub_cols = [sub_cols]
+#     if not isinstance(within_cols, list):
+#         within_cols = [within_cols]
+#     df = df.copy()
+#     if len(within_cols) > 0:
+#         df['M'] = df.groupby(within_cols)[value_col].transform('mean')
+#     else:
+#         df['M'] = df[value_col].mean()
+#     df['M_S'] = df.groupby(sub_cols + within_cols)[value_col].transform('mean')
+#     df['adj_' + value_col] = (df[value_col] + df['M'] - df['M_S'])
+    
+#     return df
+
+# def rt_score(df):
+    
+#     df = df.loc[(df.rt < 3000) & (df.rt > 400) & (df.position > 10) & (df.old == df.yes)]
+#     df = loftus_masson(df, 'subject_ID', [], 'rt')
+    
+#     a = 2800
+#     c_thresh = 0.4
+#     df['csim_diff'] = df['csim'] - c_thresh
+#     df['csim_score'] = np.power(-1, df['yes']) * (np.log(df.adj_rt) - np.log(a)) 
+#     df.csim_score = df.csim_score.astype("float")
+#     mod = smf.ols(formula='csim_score ~ -1 + csim_diff', data=df)
+#     res = mod.fit()
+#     mse = res.mse_resid
+    
+#     return mse
+    
+
+# def chi_squared_error(target_stats, cmr_stats):
+    
+#     y = []
+#     y_sem = []
+#     y_hat = []
+    
+#     # Fit SPC and PFR
+#     for stat in ('spc_fr1', 'spc_frl4', 'pfr'):
+#         for ll in cmr_stats[stat]:
+#             # Skip serial position 1 for SPC when initiating recall from position 1 
+#             # (to avoid dividing by 0 standard error, since prec is always 1 by definition)
+#             if stat == 'spc_fr1':
+#                 y.append(np.atleast_1d(target_stats[stat][ll][1:]))
+#                 y_sem.append(np.atleast_1d(target_stats[stat + '_sem'][ll][1:]))
+#                 y_hat.append(np.atleast_1d(cmr_stats[stat][ll][1:]))
+#             else:
+#                 y.append(np.atleast_1d(target_stats[stat][ll]))
+#                 y_sem.append(np.atleast_1d(target_stats[stat + '_sem'][ll]))
+#                 y_hat.append(np.atleast_1d(cmr_stats[stat][ll]))
+    
+#     # Fit PLIs and PLI recency (not separated by list length)
+#     for stat in ('plis', 'pli_recency'):
+#         y.append(np.atleast_1d(target_stats[stat]))
+#         y_sem.append(np.atleast_1d(target_stats[stat + '_sem']))
+#         y_hat.append(np.atleast_1d(cmr_stats[stat]))
+        
+#     y = np.concatenate(y)
+#     y_sem = np.concatenate(y_sem)
+#     y_hat = np.concatenate(y_hat)
+    
+#     chi2_err = np.mean(((y - y_hat) / y_sem) ** 2)
+    
+#     return chi2_err
+
+
+# def sim1c_error(target_stats, cmr_stats):
+#     """
+#     Sim 1c fits only the conditional SPCs and PFR, and uses mean squared error 
+#     instead of chi-squared error because standard errors are not available.
+#     """
+#     y = []
+#     y_hat = []
+    
+#     # Fit SPC and PFR
+#     for stat in ('spc_fr1', 'spc_frl4', 'pfr'):
+#         for ll in cmr_stats[stat]:
+#             # Skip serial position 1 for SPC when initiating recall from position 1 
+#             if stat == 'spc_fr1':
+#                 y.append(np.atleast_1d(target_stats[stat][ll][1:]))
+#                 y_hat.append(np.atleast_1d(cmr_stats[stat][ll][1:]))
+#             else:
+#                 y.append(np.atleast_1d(target_stats[stat][ll]))
+#                 y_hat.append(np.atleast_1d(cmr_stats[stat][ll]))
+        
+#     y = np.concatenate(y)
+#     y_hat = np.concatenate(y_hat)
+    
+#     mse = np.mean((y - y_hat) ** 2)
+
+#     return mse

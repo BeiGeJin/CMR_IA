@@ -364,7 +364,7 @@ class CMR2(object):
         self.att_vec[self.att_vec < 0] = 0
 
         # Set up c_thresh vector for all itemno, allowing criterion shifting for different items
-        self.c_vec = self.params['c1'] * self.sem_mean + self.params['c_thresh']
+        self.c_vec = self.params['c1'] * self.sem_mean + self.params['c_thresh_itm']
 
         # extract model-calculated word frequency
         self.b0 = 6.8657
@@ -1071,7 +1071,7 @@ class CMR2(object):
         # Recognize or not using context similarity
         # c_similarity, rt = self.diffusion(self.c_old[:self.nitems_unique], self.c_in[:self.nitems_unique], max_time=self.params['rec_time_limit'])
         c_similarity = np.dot(self.c_old[:self.nitems_unique].T, self.c_in[:self.nitems_unique]) # !! similarity should not include distractors
-        rt = self.params['a'] * np.exp(-1 * self.params['b'] * np.abs(c_similarity - self.params['c_thresh'])) # !!
+        rt = self.params['a'] * np.exp(-1 * self.params['b'] * np.abs(c_similarity - self.params['c_thresh_itm'])) # !!
         self.recog_similarity.append(c_similarity.item())
         self.rec_times.append(rt.item())
 
@@ -1347,6 +1347,7 @@ def make_params(source_coding=False):
         'omega': None,
         'alpha': None,
         'c_thresh': None,
+        'c_thresh_itm': None,
         'c_thresh_ass': None,
         'd_ass': None,
         'lamb': None,
@@ -1419,9 +1420,10 @@ def make_default_params():
         s_fc = 0,
         kappa = 0.5,
         eta = 0.5,
-        omega = 8,
+        omega = 5,
         alpha = 1,
         c_thresh = 0.5,
+        c_thresh_itm = 0.5,
         c_thresh_ass = 0.5,
         d_ass = 1,
         lamb = 0.5,

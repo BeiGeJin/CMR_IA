@@ -53,8 +53,10 @@ echo Starting $PROCS script\(s\):
 for i in `seq 1 $PROCS`; do
 	echo $i
 	#$2 1>/dev/null 2>/dev/null &
-	echo qsub -l h_vmem=2G -cwd -N $PNAME -v PYFILE=$PYFILE $SH_SCRIPT; 
-	qsub -l h_vmem=2G -N $PNAME -v PYFILE=$PYFILE $SH_SCRIPT; 
+	# echo qsub -l h_vmem=2G -cwd -N $PNAME -v PYFILE=$PYFILE $SH_SCRIPT; 
+	# qsub -l h_vmem=2G -N $PNAME -v PYFILE=$PYFILE $SH_SCRIPT;
+    echo sbatch --mem=2G -J $PNAME $SH_SCRIPT
+    sbatch --mem=2G -J $PNAME $SH_SCRIPT
 	sleep 2;
 done
 
