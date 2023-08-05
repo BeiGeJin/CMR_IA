@@ -176,14 +176,14 @@ class CMR2(object):
         self.max_list_length = self.pres_nos.shape[1]
 
         # Determine and unpair when presented word pairs
-        self.paired_pres = self.pres_nos.ndim == 3 # whether presented word-pairs
-        if self.paired_pres: # unpair word-pairs
-            self.pres_nos_unpair = np.reshape(self.pres_nos,(self.nlists,self.max_list_length*self.pres_nos.shape[2]))
-        else:
-            self.pres_nos_unpair = self.pres_nos
+        # self.paired_pres = self.pres_nos.ndim == 3 # whether presented word-pairs
+        # if self.paired_pres: # unpair word-pairs
+        #     self.pres_nos_unpair = np.reshape(self.pres_nos,(self.nlists,self.max_list_length*self.pres_nos.shape[2]))
+        # else:
+        #     self.pres_nos_unpair = self.pres_nos
 
         # Determine when cue word pairs
-        self.paired_cues = self.cues_nos.ndim == 2
+        # self.paired_cues = self.cues_nos.ndim == 2
         # if self.paired_cues: # unpair word-pairs
         #     self.cues_nos_unpair = self.cues_nos.flatten()
         # else:
@@ -250,7 +250,7 @@ class CMR2(object):
         if self.mode == 'Final':  # for PEERS task
             self.extra_distract += 1
         if self.task == 'Success':  # for successive tests
-            self.extra_distract += 2
+            self.extra_distract += 2*self.nlists
         if self.task == 'CR':  # for norm cued recall
             self.extra_distract += self.nlists
         self.ndistractors = self.nlists + self.extra_distract # One distractor prior to each list + ffr + recog
@@ -796,88 +796,89 @@ class CMR2(object):
         elif self.mode == 'CR-CR':
             test1 = 'cued recall'
             test2 = 'cued recall'
-        is_test1 = True
 
         phases = ['pretrial', 'encoding', 'prerecall', test1, 'prerecall', test2]
-        trial_idx = 0  # normally, successive tests have only one list
-        for self.phase in phases:
+        for trial_idx in range(self.nlists):
+            is_test1 = True
 
-            if self.phase == 'pretrial':
-                #####
-                # Shift context before each trial
-                #####
-                # On first trial, present orthogonal item that starts the system
-                # On subsequent trials, present an interlist distractor item
-                # Assume source context changes at same rate as temporal between trials
-                source = None
-                self.beta = 1 if trial_idx == 0 else self.params['beta_rec_post']
-                self.beta_source = 1 if trial_idx == 0 else self.params['beta_rec_post']
-                self.present_item(self.distractor_idx, source, update_context=True, update_weights=False)
-                self.distractor_idx += 1
-                self.serial_position = 0
+            for self.phase in phases:
 
-            if self.phase == 'prerecall':
-                #####
-                # Shift context before recall phase (e.g., distractor)
-                #####
-                self.beta = self.params['beta_distract']
-                self.beta_source = self.params['beta_distract']
-                self.present_item(self.distractor_idx, source, update_context=True, update_weights=False)
-                self.distractor_idx += 1
-                self.ret_thresh = np.ones(self.nitems_unique, dtype=np.float32)  # reset threshold
+                if self.phase == 'pretrial':
+                    #####
+                    # Shift context before each trial
+                    #####
+                    # On first trial, present orthogonal item that starts the system
+                    # On subsequent trials, present an interlist distractor item
+                    # Assume source context changes at same rate as temporal between trials
+                    source = None
+                    self.beta = 1 if trial_idx == 0 else self.params['beta_rec_post']
+                    self.beta_source = 1 if trial_idx == 0 else self.params['beta_rec_post']
+                    self.present_item(self.distractor_idx, source, update_context=True, update_weights=False)
+                    self.distractor_idx += 1
+                    self.serial_position = 0
 
-            if self.phase == 'encoding':
-                #####
-                # Present items
-                #####
-                enc_state = 1  # 1 is good, 0 is bad, initially good state
-                rng = np.random.default_rng(seed=42)
-                for self.serial_position in range(self.pres_indexes.shape[1]):
-                    pres_idx = self.pres_indexes[trial_idx, self.serial_position]
-                    self.beta = self.params['beta_enc']
-                    self.beta_source = 0
-                    change_state = rng.choice([False,True], p=[self.var_enc_p,1-self.var_enc_p])
-                    if change_state:
-                        enc_state = 1 - enc_state
-                        if enc_state == 1:
-                            self.L_FC.fill(self.params['gamma_fc'])
-                            self.L_CF.fill(self.params['gamma_cf'])
-                        elif enc_state == 0:
-                            self.L_FC.fill(self.params['gamma_fc'] * self.params['bad_enc_ratio'])
-                            self.L_CF.fill(self.params['gamma_cf'] * self.params['bad_enc_ratio'])
-                    self.present_item(pres_idx, source, update_context=True, update_weights=True)
-            
-            if self.phase == 'recognition':
-                #####
-                # Simulate recognition
-                #####
-                if is_test1:
-                    cue_indexes = self.cues_indexes[0:self.test1_num]
-                    is_test1 = False
-                else:
-                    cue_indexes = self.cues_indexes[self.test1_num:]
-                for cue_idx in cue_indexes:
-                    if np.logical_not(np.isscalar(cue_idx)) and cue_idx[1] == -1:
-                        cue_idx = cue_idx[0].astype(int)
-                    self.beta = self.params['beta_cue']
-                    self.beta_source = 0
-                    self.simulate_recog(cue_idx)  # can be pair, can be scalar
+                if self.phase == 'prerecall':
+                    #####
+                    # Shift context before recall phase (e.g., distractor)
+                    #####
+                    self.beta = self.params['beta_distract']
+                    self.beta_source = self.params['beta_distract']
+                    self.present_item(self.distractor_idx, source, update_context=True, update_weights=False)
+                    self.distractor_idx += 1
+                    self.ret_thresh = np.ones(self.nitems_unique, dtype=np.float32)  # reset threshold
+
+                if self.phase == 'encoding':
+                    #####
+                    # Present items
+                    #####
+                    enc_state = 1  # 1 is good, 0 is bad, initially good state
+                    rng = np.random.default_rng(seed=42)
+                    for self.serial_position in range(self.pres_indexes.shape[1]):
+                        pres_idx = self.pres_indexes[trial_idx, self.serial_position]
+                        self.beta = self.params['beta_enc']
+                        self.beta_source = 0
+                        change_state = rng.choice([False,True], p=[self.var_enc_p,1-self.var_enc_p])
+                        if change_state:
+                            enc_state = 1 - enc_state
+                            if enc_state == 1:
+                                self.L_FC.fill(self.params['gamma_fc'])
+                                self.L_CF.fill(self.params['gamma_cf'])
+                            elif enc_state == 0:
+                                self.L_FC.fill(self.params['gamma_fc'] * self.params['bad_enc_ratio'])
+                                self.L_CF.fill(self.params['gamma_cf'] * self.params['bad_enc_ratio'])
+                        self.present_item(pres_idx, source, update_context=True, update_weights=True)
                 
-            if self.phase == 'cued recall':
-                #####
-                # Simulate cued recall
-                #####
-                if is_test1:
-                    cue_indexes = self.cues_indexes[0:self.test1_num]
-                    is_test1 = False
-                else:
-                    cue_indexes = self.cues_indexes[self.test1_num:]
-                for cue_idx in cue_indexes:
-                    if np.logical_not(np.isscalar(cue_idx)) and cue_idx[1] == -1:
-                        cue_idx = cue_idx[0].astype(int)
-                    self.beta = self.params['beta_cue']
-                    self.beta_source = 0
-                    self.simulate_cr(cue_idx)  # should be scalar
+                if self.phase == 'recognition':
+                    #####
+                    # Simulate recognition
+                    #####
+                    if is_test1:
+                        cue_indexes = self.cues_indexes[trial_idx, 0:self.test1_num]
+                        is_test1 = False
+                    else:
+                        cue_indexes = self.cues_indexes[trial_idx, self.test1_num:]
+                    for cue_idx in cue_indexes:
+                        if np.logical_not(np.isscalar(cue_idx)) and cue_idx[1] == -1:
+                            cue_idx = cue_idx[0].astype(int)
+                        self.beta = self.params['beta_cue']
+                        self.beta_source = 0
+                        self.simulate_recog(cue_idx)  # can be pair, can be scalar
+                    
+                if self.phase == 'cued recall':
+                    #####
+                    # Simulate cued recall
+                    #####
+                    if is_test1:
+                        cue_indexes = self.cues_indexes[trial_idx, 0:self.test1_num]
+                        is_test1 = False
+                    else:
+                        cue_indexes = self.cues_indexes[trial_idx, self.test1_num:]
+                    for cue_idx in cue_indexes:
+                        if np.logical_not(np.isscalar(cue_idx)) and cue_idx[1] == -1:
+                            cue_idx = cue_idx[0].astype(int)
+                        self.beta = self.params['beta_cue']
+                        self.beta_source = 0
+                        self.simulate_cr(cue_idx)  # should be scalar
 
     def present_item(self, item_idx, source=None, update_context=True, update_weights=True):
         """
@@ -1836,7 +1837,7 @@ def run_norm_cr_multi_sess(params, df_study, df_test, sem_mat, source_mat=None, 
         pres_mat = df_study.loc[df_study.session == sess, ['study_itemno1', 'study_itemno2']].to_numpy()
         pres_mat = np.reshape(pres_mat, (list_num, -1, 2))
         cue_mat = df_thin.loc[df_thin.session == sess, 'test_itemno'].to_numpy()
-        cue_mat = np.reshape(cue_mat,(list_num,-1))
+        cue_mat = np.reshape(cue_mat, (list_num, -1))
 
         # run CMR for each session
         cmr = CMR2(params, pres_mat, sem_mat, source_mat=None,
@@ -1890,17 +1891,19 @@ def run_success_multi_sess(params, df_study, df_test, sem_mat, source_mat=None, 
     now_test = time.time()
 
     sessions = np.unique(df_study.session)
-    df_thin = df_test[['session','test_itemno1','test_itemno2']]
+    list_num = len(np.unique(df_study.list))
+    df_thin = df_test[['session','list','test_itemno1','test_itemno2']]
     df_thin = df_thin.assign(s_resp=np.nan, s_rt=np.nan, csim=np.nan)
     f_in = []
     f_dif = []
-    test1_num = sum(df_test.query("session == 0").test == 1)
+    test1_num = sum(df_test.query("session == 0 and list == 0").test == 1)
 
     for sess in sessions:
         # extarct the session data
         pres_mat = df_study.loc[df_study.session == sess, ['study_itemno1', 'study_itemno2']].to_numpy()
-        pres_mat = np.reshape(pres_mat, (1, -1, 2))
+        pres_mat = np.reshape(pres_mat, (list_num, -1, 2))
         cue_mat = df_thin.loc[df_thin.session == sess, ['test_itemno1','test_itemno2']].to_numpy()
+        cue_mat = np.reshape(cue_mat, (list_num, -1, 2))
 
         # run CMR for each session
         cmr = CMR2(params, pres_mat, sem_mat, source_mat=None,
