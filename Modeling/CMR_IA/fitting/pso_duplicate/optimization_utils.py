@@ -51,7 +51,8 @@ def make_boundary(sim_name):
                    lamb = 0,
                    gamma_fc = 0, 
                    gamma_cf = 0,
-                   d_ass = 0
+                   d_ass = 0,
+                   thresh_sigma = 0,
                    )
     
     ub_dict = cmr.make_params()
@@ -74,7 +75,8 @@ def make_boundary(sim_name):
                    lamb = 0.25,
                    gamma_fc = 1, 
                    gamma_cf = 1,
-                   d_ass = 1
+                   d_ass = 1,
+                   thresh_sigma = 0.5,
                    )
 
    # Which Parameters to fit
@@ -83,7 +85,7 @@ def make_boundary(sim_name):
     elif sim_name == 'S1':
         what_to_fit = ['beta_enc', 'beta_rec', 'beta_cue', 'beta_rec_post', 'beta_distract', 'gamma_fc', 'gamma_cf', 's_fc', 's_cf', 'phi_s', 'phi_d', 'kappa', 'lamb', 'eta', 'omega', 'alpha', 'c_thresh', 'c_thresh_itm', 'c_thresh_ass', 'd_ass']
     elif sim_name == 'S2':
-        what_to_fit = ['beta_enc', 'beta_rec', 'beta_cue', 'beta_rec_post', 'beta_distract', 'gamma_fc', 's_fc', 'c_thresh_itm', 'c_thresh_ass', 'd_ass']
+        what_to_fit = ['beta_enc', 'beta_rec', 'beta_cue', 'beta_rec_post', 'beta_distract', 'gamma_fc', 's_fc', 'c_thresh_itm', 'c_thresh_ass', 'd_ass', 'thresh_sigma']
 
     lb = [lb_dict[key] for key in what_to_fit]
     ub = [ub_dict[key] for key in what_to_fit]

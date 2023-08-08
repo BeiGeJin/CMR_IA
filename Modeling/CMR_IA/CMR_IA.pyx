@@ -366,6 +366,10 @@ class CMR2(object):
         # Set up c_thresh vector for all itemno, allowing criterion shifting for different items
         self.c_vec = self.params['c1'] * self.sem_mean + self.params['c_thresh_itm']
 
+        # Set up random mechanism for threshold
+        self.thresh_rng = np.random.default_rng(87)
+        self.thresh_sigma = self.params['thresh_sigma']
+
         # extract model-calculated word frequency
         self.b0 = 6.8657
         self.b1 = -12.7856
@@ -1077,9 +1081,9 @@ class CMR2(object):
         self.rec_times.append(rt.item())
 
         if paired_cue:
-            thresh = self.params['c_thresh_ass']
+            thresh = self.params['c_thresh_ass'] + self.thresh_rng.uniform(-self.thresh_sigma, self.thresh_sigma)
         else:
-            thresh = self.c_vec[self.all_nos_unique[cue_idx] - 1]
+            thresh = self.c_vec[self.all_nos_unique[cue_idx] - 1] + self.thresh_rng.uniform(-self.thresh_sigma, self.thresh_sigma)
 
         if c_similarity >= thresh:
             self.rec_items.append(1)  # YES
@@ -1369,10 +1373,11 @@ def make_params(source_coding=False):
         'n': None,
 
         # [bj] Criterion-shift parameters for WFE
-        'c1':None,
+        'c1': None,
+        'thresh_sigma': None,
 
         # [bj] Impossible recall items
-        'No_recall':None,
+        'No_recall': None,
 
         # [bj] Variability in encoding
         'var_enc': 1,
@@ -1435,6 +1440,7 @@ def make_default_params():
         m = 0,
         n = 1,
         c1 = 0,
+        thresh_sigma = 0,
         var_enc = 1,
         bad_enc_ratio = 1,
     )
