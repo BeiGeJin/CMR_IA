@@ -185,7 +185,7 @@ def anal_perform_S2(df_simu):
         return (A * D - B * C) / (A * D + B * C)
     
     qs = []
-    conditions = ['Different_Item', 'Item_Pair', 'Pair_Item', 'Intact_Pair', 'Same_Item', 'Repeated_Lure', 'NR_Lure']
+    conditions = ['Different_Item', 'Item_Pair', 'Pair_Item', 'Same_Item', 'Intact_Pair', 'Repeated_Lure', 'NR_Lure']
     for cond in conditions:
         df_tmp = df_pair.query(f"condition == '{cond}'")
         test2_rsp = pd.Categorical(df_tmp.test2, categories=[0,1])
