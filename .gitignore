@@ -2,3 +2,5 @@ Modeling/CMR_IA/fitting/outfiles
 Modeling/CMR_IA/fitting/noise_files
 Modeling/CMR_IA/fitting/pso_duplicate
 Modeling/CMR_IA/fitting
+.idea
+.ipynb_checkpoints
