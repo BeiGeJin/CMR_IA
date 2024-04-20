@@ -504,8 +504,8 @@ def run_pso(df_study, df_test, sem_mat, sources, sim_name=''):
 
     # Set PSO parameters
     alg = 'pso2'
-    swarmsize = 100
-    n_iter = 200
+    swarmsize = 5
+    n_iter = 5
     omega_min = .72984 if alg in ('pso2', 'awl') else .3 if alg == 'apso6' else .4
     omega_max = .72984 if alg in ('pso2', 'awl') else .9
     d_omega = .1  # Delta omega for apso6 algorithm
@@ -564,7 +564,44 @@ if __name__ == "__main__":
 
     elif SIM == 'S2':
          
-        with open("../../../../Data/simuS2_design.pkl", 'rb') as inp:
+        with open("../../../../Analysis/simuS2_recog_recog/simuS2_design.pkl", 'rb') as inp:
+            df_study = pkl.load(inp)
+            df_test = pkl.load(inp)
+        sources = None       
+
+    else:
+        raise ValueError('Simulation name not recognized')
+        
+    # Load semantic similarity matrix (word2vec)
+    sem_mat = np.load(sem_file)
+
+    run_pso(df_study, df_test, sem_mat, sources, sim_name=SIM)
+
+# test cmldask
+def pso_main(dumb):
+    
+    # SIM = 'David'
+    # SIM = 'S1'
+    SIM = 'S2'
+    sem_file = '../../../../Data/wordpools/ltp_FR_similarity_matrix.npy'
+
+    if SIM == 'David':
+        
+        with open("/home1/beigejin/Recog_David/data_als/data_df_clean.pkl", 'rb') as inp:
+            df = pkl.load(inp)
+        # df = df.loc[df.subject_ID < 10]
+        sources = None
+    
+    elif SIM == 'S1':
+
+        with open("../../../../Data/simuS1_design.pkl", 'rb') as inp:
+            df_study = pkl.load(inp)
+            df_test = pkl.load(inp)
+        sources = None
+
+    elif SIM == 'S2':
+         
+        with open("../../../../Analysis/simuS2_recog_recog/simuS2_data/simuS2_design.pkl", 'rb') as inp:
             df_study = pkl.load(inp)
             df_test = pkl.load(inp)
         sources = None       

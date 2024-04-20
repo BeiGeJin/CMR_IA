@@ -10,7 +10,7 @@ import pickle as pkl
 from glob import glob
 from noise_maker_pso import make_noise
 from optimization_utils import make_boundary
-from object_funcs import obj_func_S1, obj_func_S2
+from object_funcs import obj_func_S1, obj_func_S2, obj_func_6b
 
 # Set where you want your noise files and output files to be saved
 global OUTDIR
@@ -504,7 +504,7 @@ def run_pso(df_study, df_test, sem_mat, sources, sim_name=''):
 
     # Set PSO parameters
     alg = 'pso2'
-    swarmsize = 100
+    swarmsize = 500
     n_iter = 200
     omega_min = .72984 if alg in ('pso2', 'awl') else .3 if alg == 'apso6' else .4
     omega_max = .72984 if alg in ('pso2', 'awl') else .9
@@ -524,6 +524,8 @@ def run_pso(df_study, df_test, sem_mat, sources, sim_name=''):
         func = obj_func_S1
     elif sim_name == 'S2':
         func = obj_func_S2
+    elif sim_name == '6b':
+        func = obj_func_6b
     
     print('Generating noise files...')
     make_noise(swarmsize, n_iter, lb, ub, NOISE_DIR)
@@ -546,6 +548,7 @@ if __name__ == "__main__":
     # SIM = 'David'
     SIM = 'S1'
     # SIM = 'S2'
+    # SIM = '6b'
     sem_file = '../../../Data/wordpools/ltp_FR_similarity_matrix.npy'
 
     if SIM == 'David':
@@ -557,17 +560,23 @@ if __name__ == "__main__":
     
     elif SIM == 'S1':
 
-        with open("../../../Data/simuS1_design.pkl", 'rb') as inp:
+        with open("../../../Analysis/simuS1_recog_cr/simuS1_data/simuS1_design.pkl", 'rb') as inp:
             df_study = pkl.load(inp)
             df_test = pkl.load(inp)
         sources = None
 
     elif SIM == 'S2':
          
-        with open("../../../Data/simuS2_design.pkl", 'rb') as inp:
+        with open("../../../Analysis/simuS2_recog_recog/simuS2_data/simuS2_design.pkl", 'rb') as inp:
             df_study = pkl.load(inp)
             df_test = pkl.load(inp)
-        sources = None       
+        sources = None
+
+    elif SIM == '6b':
+        with open("../../../Analysis/simu6b_cr_sym/simu6b_data/simu6b_design.pkl", 'rb') as inp:
+            df_study = pkl.load(inp)
+            df_test = pkl.load(inp)
+        sources = None
 
     else:
         raise ValueError('Simulation name not recognized')

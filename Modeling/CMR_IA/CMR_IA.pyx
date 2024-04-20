@@ -237,6 +237,7 @@ class CMR2(object):
         self.beta = 0
         self.beta_source = 0
         self.var_enc_p = self.params['var_enc']
+        self.changestate_rng = np.random.default_rng(seed=42)
 
         ##########
         #
@@ -335,6 +336,9 @@ class CMR2(object):
         # Calculate dt_tau and its square root based on dt
         self.params['dt_tau'] = self.params['dt'] / 1000.
         self.params['sq_dt_tau'] = np.sqrt(self.params['dt_tau'])
+
+        # Set up random seed
+        srand(12345)
 
         ##########
         #
@@ -836,12 +840,11 @@ class CMR2(object):
                     # Present items
                     #####
                     enc_state = 1  # 1 is good, 0 is bad, initially good state
-                    rng = np.random.default_rng(seed=42)
                     for self.serial_position in range(self.pres_indexes.shape[1]):
                         pres_idx = self.pres_indexes[trial_idx, self.serial_position]
                         self.beta = self.params['beta_enc']
                         self.beta_source = 0
-                        change_state = rng.choice([False,True], p=[self.var_enc_p,1-self.var_enc_p])
+                        change_state = self.changestate_rng.choice([False,True], p=[self.var_enc_p,1-self.var_enc_p])
                         if change_state:
                             enc_state = 1 - enc_state
                             if enc_state == 1:
@@ -1300,7 +1303,7 @@ class CMR2(object):
                     winner_vec[j] = i
                     j += 1
                 i += 1
-            srand(time.time())
+            # srand(time.time())
             rand_idx = rand() % nwinners  # see http://www.delorie.com/djgpp/doc/libc/libc_637.html
             winner = winner_vec[rand_idx]
         # If only one item crossed the retrieval threshold, we already set it as the winner above

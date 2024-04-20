@@ -31,59 +31,160 @@ def make_boundary(sim_name):
     """
 
     # Generate a base paramater dictionary
+    # lb_dict = cmr.make_params()
+    # lb_dict.update(beta_enc = 0, 
+    #                beta_rec = 0, 
+    #                beta_cue = 0,
+    #                beta_distract = 0,
+    #                beta_rec_post = 0, 
+    #                phi_s = 0, 
+    #                phi_d = 0, 
+    #                s_cf = 0,
+    #                s_fc = 0,
+    #                kappa = 0, 
+    #                eta = 0, 
+    #                omega = 1, 
+    #                alpha = 0.5, 
+    #                c_thresh = 0,
+    #                c_thresh_itm = 0, 
+    #                c_thresh_ass = 0,
+    #                lamb = 0,
+    #                gamma_fc = 0, 
+    #                gamma_cf = 0,
+    #                d_ass = 0,
+    #                thresh_sigma = 0,
+    #                )
+    
+    # ub_dict = cmr.make_params()
+    # ub_dict.update(beta_enc = 1, 
+    #                beta_rec = 1,
+    #                beta_cue = 1,
+    #                beta_distract = 1, 
+    #                beta_rec_post = 1, 
+    #                phi_s = 8, 
+    #                phi_d = 5, 
+    #                s_cf = 1,
+    #                s_fc = 1,
+    #                kappa = 0.5, 
+    #                eta = 0.25, 
+    #                omega = 10, 
+    #                alpha = 1, 
+    #                c_thresh = 1,
+    #                c_thresh_itm = 1,
+    #                c_thresh_ass = 1, 
+    #                lamb = 0.25,
+    #                gamma_fc = 1, 
+    #                gamma_cf = 1,
+    #                d_ass = 1,
+    #                thresh_sigma = 0.5,
+    #                )
+    
+    # exp2 improved boundaries
+    # lb_dict = cmr.make_params()
+    # lb_dict.update(beta_enc = 0.2, 
+    #                beta_rec = 0.4, 
+    #                beta_cue = 0,
+    #                beta_distract = 0,
+    #                beta_rec_post = 0.4, 
+    #                phi_s = 0, 
+    #                phi_d = 0, 
+    #                s_cf = 0,
+    #                s_fc = 0.2,
+    #                kappa = 0, 
+    #                eta = 0, 
+    #                omega = 1, 
+    #                alpha = 0.5, 
+    #                c_thresh = 0,
+    #                c_thresh_itm = 0.6, 
+    #                c_thresh_ass = 0.6,
+    #                lamb = 0,
+    #                gamma_fc = 0, 
+    #                gamma_cf = 0,
+    #                d_ass = 0.6,
+    #                thresh_sigma = 0,
+    #                )
+    
+    # ub_dict = cmr.make_params()
+    # ub_dict.update(beta_enc = 0.8, 
+    #                beta_rec = 0.8,
+    #                beta_cue = 0.5,
+    #                beta_distract = 0.6, 
+    #                beta_rec_post = 1, 
+    #                phi_s = 8, 
+    #                phi_d = 5, 
+    #                s_cf = 1,
+    #                s_fc = 0.8,
+    #                kappa = 0.5, 
+    #                eta = 0.25, 
+    #                omega = 10, 
+    #                alpha = 1, 
+    #                c_thresh = 1,
+    #                c_thresh_itm = 1,
+    #                c_thresh_ass = 1, 
+    #                lamb = 0.25,
+    #                gamma_fc = 0.4, 
+    #                gamma_cf = 1,
+    #                d_ass = 1,
+    #                thresh_sigma = 0.2,
+    #                )
+
+    # exp1 improved boundaries
     lb_dict = cmr.make_params()
-    lb_dict.update(beta_enc = 0, 
+    lb_dict.update(beta_enc = 0.2, 
                    beta_rec = 0, 
-                   beta_cue = 0,
-                   beta_distract = 0,
-                   beta_rec_post = 0, 
-                   phi_s = 0, 
-                   phi_d = 0, 
+                   beta_cue = 0.4,
+                   beta_distract = 0.4,
+                   beta_rec_post = 0.4, 
+                   phi_s = 2, 
+                   phi_d = 2, 
                    s_cf = 0,
                    s_fc = 0,
                    kappa = 0, 
                    eta = 0, 
-                   omega = 1, 
+                   omega = 5, 
                    alpha = 0.5, 
-                   c_thresh = 0,
-                   c_thresh_itm = 0, 
-                   c_thresh_ass = 0,
+                   c_thresh = 0.2,
+                   c_thresh_itm = 0.2, 
+                   c_thresh_ass = 0.4,
                    lamb = 0,
                    gamma_fc = 0, 
-                   gamma_cf = 0,
-                   d_ass = 0
+                   gamma_cf = 0.6,
+                   d_ass = 0.6,
+                   thresh_sigma = 0,
                    )
     
     ub_dict = cmr.make_params()
-    ub_dict.update(beta_enc = 1, 
-                   beta_rec = 1,
+    ub_dict.update(beta_enc = 0.8, 
+                   beta_rec = 0.6,
                    beta_cue = 1,
                    beta_distract = 1, 
                    beta_rec_post = 1, 
-                   phi_s = 8, 
+                   phi_s = 5, 
                    phi_d = 5, 
                    s_cf = 1,
-                   s_fc = 1,
+                   s_fc = 0.4,
                    kappa = 0.5, 
                    eta = 0.25, 
                    omega = 10, 
                    alpha = 1, 
-                   c_thresh = 1,
-                   c_thresh_itm = 1,
-                   c_thresh_ass = 1, 
-                   lamb = 0.25,
-                   gamma_fc = 1, 
+                   c_thresh = 0.8,
+                   c_thresh_itm = 0.6,
+                   c_thresh_ass = 0.8, 
+                   lamb = 0.2,
+                   gamma_fc = 0.4, 
                    gamma_cf = 1,
-                   d_ass = 1
+                   d_ass = 1,
+                   thresh_sigma = 1,
                    )
-
    # Which Parameters to fit
     if sim_name == 'David':
         what_to_fit = ['beta_enc','beta_rec','beta_rec_post','s_fc','gamma_fc']
     elif sim_name == 'S1':
         what_to_fit = ['beta_enc', 'beta_rec', 'beta_cue', 'beta_rec_post', 'beta_distract', 'gamma_fc', 'gamma_cf', 's_fc', 's_cf', 'phi_s', 'phi_d', 'kappa', 'lamb', 'eta', 'omega', 'alpha', 'c_thresh', 'c_thresh_itm', 'c_thresh_ass', 'd_ass']
     elif sim_name == 'S2':
-        what_to_fit = ['beta_enc', 'beta_rec', 'beta_cue', 'beta_rec_post', 'beta_distract', 'gamma_fc', 's_fc', 'c_thresh_itm', 'c_thresh_ass', 'd_ass']
+        what_to_fit = ['beta_enc', 'beta_rec', 'beta_cue', 'beta_rec_post', 'beta_distract', 'gamma_fc', 's_fc', 'c_thresh_itm', 'c_thresh_ass', 'd_ass', 'thresh_sigma']
+    elif sim_name == '6b':
+        what_to_fit = ['beta_enc', 'beta_rec', 'beta_cue', 'beta_rec_post', 'beta_distract', 'gamma_fc', 'gamma_cf', 's_fc', 's_cf', 'phi_s', 'phi_d', 'kappa', 'lamb', 'eta', 'omega', 'alpha', 'c_thresh', 'd_ass']
 
     lb = [lb_dict[key] for key in what_to_fit]
     ub = [ub_dict[key] for key in what_to_fit]

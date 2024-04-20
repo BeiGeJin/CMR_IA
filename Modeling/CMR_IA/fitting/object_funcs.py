@@ -185,7 +185,7 @@ def anal_perform_S2(df_simu):
         return (A * D - B * C) / (A * D + B * C)
     
     qs = []
-    conditions = ['Different_Item', 'Item_Pair', 'Pair_Item', 'Intact_Pair', 'Same_Item', 'Repeated_Lure', 'NR_Lure']
+    conditions = ['Different_Item', 'Item_Pair', 'Pair_Item', 'Same_Item', 'Intact_Pair', 'Repeated_Lure', 'NR_Lure']
     for cond in conditions:
         df_tmp = df_pair.query(f"condition == '{cond}'")
         test2_rsp = pd.Categorical(df_tmp.test2, categories=[0,1])
@@ -208,6 +208,95 @@ def anal_perform_S2(df_simu):
     stats = df_res.values.tolist()
 
     return stats
+
+
+def obj_func_6b(param_vec, df_study, df_test, sem_mat, sources):
+
+    # Reformat parameter vector to the dictionary format expected by CMR2
+    param_dict = param_vec_to_dict(param_vec, sim_name = '6b')
+    
+    # Run model with the parameters given in param_vec
+    param_dict.update(learn_while_retrieving=True, nitems_in_accumulator = 96)
+    df_simu, _, _ = cmr.run_success_multi_sess(param_dict, df_study, df_test, sem_mat, mode="CR-CR")
+    df_simu['test_pos'] = np.tile(np.arange(1,25),600)  # 100 * 6
+    df_simu = df_simu.merge(df_test,on=['session','list', 'test_itemno1','test_itemno2', 'test_pos'])
+
+    # Get correctness
+    df_simu['correct'] = df_simu.s_resp == df_simu.correct_ans
+
+    # Get conditions
+    df_cond = df_simu.groupby(["pair_idx","test"])['order'].mean().to_frame(name='corr_rate').reset_index()
+    df_cond = df_cond.pivot_table(index='pair_idx',columns='test',values='corr_rate').reset_index()
+    df_cond.columns = ['pair_idx','test1','test2']
+
+    def cond(x):
+        test1 = x['test1']
+        test2 = x['test2']
+        if test1 == 1 and test2 == 1:
+            return 'F-F'
+        elif test1 == 1 and test2 == 2:
+            return 'F-B'
+        elif test1 == 2 and test2 == 1:
+            return 'B-F'
+        elif test1 == 2 and test2 == 2:
+            return 'B-B'
+
+    df_cond['cond'] = df_cond.apply(lambda x:cond(x),axis=1)
+    df_cond['cong'] = df_cond.apply(lambda x: 'Identical' if x['cond'] == 'F-F' or x['cond'] == 'B-B' else 'Reversed',axis=1)
+    pairidx2cond = df_cond.loc[:,['pair_idx','cond']].set_index("pair_idx").to_dict()['cond']
+    pairidx2cong = df_cond.loc[:,['pair_idx','cong']].set_index("pair_idx").to_dict()['cong']
+    df_simu['cond'] = df_simu.apply(lambda x:pairidx2cond[x['pair_idx']],axis=1)
+    df_simu['cong'] = df_simu.apply(lambda x:pairidx2cong[x['pair_idx']],axis=1)
+
+    # Get behavioral stats
+    subjects = np.unique(df_simu.session)
+    inde_stats = []
+    reve_stats = []
+    for subj in subjects:
+        df_subj_inde = df_simu.query(f"session == {subj} and cong == 'Identical'").copy()
+        inde_stats.append(list(anal_perform_6b(df_subj_inde)))
+
+        df_subj_reve = df_simu.query(f"session == {subj} and cong == 'Reversed'").copy()
+        reve_stats.append(list(anal_perform_6b(df_subj_reve)))
+
+    # Score the model's behavioral stats as compared with the true data 
+    inde_stats_mean = np.mean(inde_stats,axis=0)
+    reve_stats_mean = np.mean(reve_stats,axis=0)
+    inde_ground_truth = np.array([0.319, 0.006, 0.012, 0.663, 0.94])
+    reve_ground_truth = np.array([0.293, 0.049, 0.122, 0.537, 0.96])
+    err = (np.mean(np.power(inde_stats_mean-inde_ground_truth,2)) + np.mean(np.power(reve_stats_mean-reve_ground_truth,2)))/2
+
+    cmr_stats = {}
+    cmr_stats['err'] = err
+    cmr_stats['params'] = param_vec
+    cmr_stats['stats'] = [inde_stats_mean, reve_stats_mean]
+
+    return err, cmr_stats
+
+def anal_perform_6b(df_simu):
+
+    # get pair
+    df_pair = pd.pivot_table(df_simu,index='pair_idx',columns='test', values= 'correct')
+    df_pair.columns = ['test1','test2']
+    test2_rsp = pd.Categorical(df_pair.test2, categories=[1,0])
+    test1_rsp = pd.Categorical(df_pair.test1, categories=[1,0])
+    df_tab = pd.crosstab(index=test2_rsp,columns=test1_rsp, rownames=['test2'], colnames=['test1'], normalize=False, dropna=False)
+    df_tab_norm = pd.crosstab(index=test2_rsp,columns=test1_rsp, rownames=['test2'], colnames=['test1'], normalize='all', dropna=False)
+    t1_t2 = df_tab_norm[1][1] # 1, 2
+    t1_f2 = df_tab_norm[1][0]
+    f1_t2 = df_tab_norm[0][1]
+    f1_f2 = df_tab_norm[0][0]
+    # print(df_tab)
+    # print(df_tab_norm)
+    # print(t1_t2, t1_f2, f1_t2, f1_f2)
+
+    # compute" Q
+    def Yule_Q(A, B, C, D):
+        return (A * D - B * C) / (A * D + B * C)
+    q = Yule_Q(df_tab[1][1]+0.5,df_tab[0][1]+0.5,df_tab[1][0]+0.5,df_tab[0][0]+0.5)  # add 0.5
+    # print("Q: ", q)
+
+    return t1_t2, t1_f2, f1_t2, f1_f2, q
 
 # def obj_func(param_vec, df, w2v, sources, return_recalls=False, mode='RT_score'):
     
