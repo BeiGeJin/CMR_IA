@@ -4,3 +4,6 @@ Modeling/CMR_IA/fitting/pso_duplicate
 Modeling/CMR_IA/fitting
 .idea
 .ipynb_checkpoints
+*/.ipynb_checkpoints
+*/.idea
+*/.__pycache__
