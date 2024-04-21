@@ -1,6 +1,6 @@
 from __future__ import print_function
-import mkl
-mkl.set_num_threads(1)
+# import mkl
+# mkl.set_num_threads(1)
 import os
 import sys
 import math
@@ -8,6 +8,7 @@ import time
 import json
 import numpy as np
 import scipy.io
+from tqdm import tqdm
 from glob import glob
 from libc.stdlib cimport rand, srand, RAND_MAX
 from libc.math cimport log, sqrt
@@ -70,6 +71,7 @@ cdef cython_randn(int n):
         result[n - 1] = random_gaussian()
 
     return result
+
 
 class CMR2(object):
 
@@ -379,6 +381,447 @@ class CMR2(object):
         self.b1 = -12.7856
         self.cal_word_freq = np.exp(self.b0 + self.sem_mean * self.b1)
 
+
+    def present_item(self, item_idx, source=None, update_context=True, update_weights=True, use_new_context=False):
+        """
+        Presents a single item (or distractor) to the model by updating the
+        feature vector. Also provides options to update context and the model's
+        associative matrices after presentation. [Modified by Beige]
+
+        :param item_idx: The index of the cell within the feature vector that
+            should be activated by the presented item. If None, presents an
+            empty feature vector.
+        :param source: If None, no source features will be activated. If a 1D
+            array, the source features in the feature vector will be set to
+            match the numbers in the source array.
+        :param update_context: If True, the context vector will update after
+            the feature vector has been updated. If False, the feature vector
+            will update but the context vector will not change.
+        :param update_weights: If True, the model's weight matrices will update
+            to strengthen the association between the presented item and the
+            state of context at the time of presentation. If False, no learning
+            will occur after item presentation.
+        """
+        ##########
+        #
+        # Activate item's features
+        #
+        ##########
+
+        paired_pres = np.logical_not(np.isscalar(item_idx))
+
+        # Activate the presented item itself
+        self.f.fill(0)
+        if item_idx is not None:
+            self.f[item_idx] = 1
+
+        # Activate the source feature(s) of the presented item
+        if self.nsources > 0 and source is not None:
+            self.f[self.first_source_idx:, 0] = np.atleast_1d(source)
+
+        # copy c_old
+        # [bj] put this out of update context
+        self.c_old = self.c.copy()
+
+        # Compute c_in
+        self.c_in = np.dot(self.M_FC, self.f)
+
+        # Normalize the temporal and source subregions of c_in separately
+        norm_t = np.sqrt(np.sum(self.c_in[:self.ntemporal] ** 2))
+        if norm_t != 0:
+            self.c_in[:self.ntemporal] /= norm_t
+        if self.nsources > 0:
+            norm_s = np.sqrt(np.sum(self.c_in[self.ntemporal:] ** 2))
+            if norm_s != 0:
+                self.c_in[self.ntemporal:] /= norm_s
+
+        ##########
+        #
+        # Update context
+        #
+        ##########
+
+        if update_context:
+
+            # Set beta separately for temporal and source subregions
+            beta_vec = np.empty_like(self.c)
+            beta_vec[:self.ntemporal] = self.beta
+            beta_vec[self.ntemporal:] = self.beta_source
+
+            # Calculate rho for the temporal and source subregions
+            rho_vec = np.empty_like(self.c)
+            c_dot_t = np.dot(self.c[:self.ntemporal].T, self.c_in[:self.ntemporal]).item()
+            rho_vec[:self.ntemporal] = math.sqrt(1 + self.beta ** 2 * (c_dot_t ** 2 - 1)) - self.beta * c_dot_t
+            c_dot_s = np.dot(self.c[self.ntemporal:].T, self.c_in[self.ntemporal:]).item()
+            rho_vec[self.ntemporal:] = math.sqrt(1 + self.beta_source ** 2 * (c_dot_s ** 2 - 1)) - self.beta_source * c_dot_s
+
+            # Update context
+            self.c = (rho_vec * self.c_old) + (beta_vec * self.c_in)
+
+        ##########
+        #
+        # Update weight matrices
+        #
+        ##########
+
+        if update_weights:
+            if use_new_context:
+                if self.phase == 'encoding': # [bj] Only apply elevated-attention scaling during encoding
+                    self.M_FC[:self.nitems_unique,:self.nitems_unique] \
+                        += self.L_FC[:self.nitems_unique,:self.nitems_unique] \
+                        * np.dot(self.c[:self.nitems_unique], self.f[:self.nitems_unique].T) \
+                        * np.mean(self.att_vec[self.all_nos_unique[item_idx]-1])
+                    self.M_CF[:self.nitems_unique,:self.nitems_unique] \
+                        += self.L_CF[:self.nitems_unique,:self.nitems_unique] \
+                        * np.dot(self.f[:self.nitems_unique], self.c[:self.nitems_unique].T) \
+                        * self.prim_vec[self.serial_position] \
+                        * np.mean(self.att_vec[self.all_nos_unique[item_idx]-1])
+                else:
+                    self.M_FC[:self.nitems_unique,:self.nitems_unique] \
+                        += self.L_FC[:self.nitems_unique,:self.nitems_unique] \
+                        * np.dot(self.c[:self.nitems_unique], self.f[:self.nitems_unique].T)
+                    self.M_CF[:self.nitems_unique,:self.nitems_unique] \
+                        += self.L_CF[:self.nitems_unique,:self.nitems_unique] \
+                        * np.dot(self.f[:self.nitems_unique], self.c[:self.nitems_unique].T)
+            else:
+                if self.phase == 'encoding': # [bj] Only apply elevated-attention and primacy scaling during encoding
+                    self.M_FC[:self.nitems_unique,:self.nitems_unique] \
+                        += self.L_FC[:self.nitems_unique,:self.nitems_unique] \
+                        * np.dot(self.c_old[:self.nitems_unique], self.f[:self.nitems_unique].T) \
+                        * np.mean(self.att_vec[self.all_nos_unique[item_idx]-1])
+                    self.M_CF[:self.nitems_unique,:self.nitems_unique] \
+                        += self.L_CF[:self.nitems_unique,:self.nitems_unique] \
+                        * np.dot(self.f[:self.nitems_unique], self.c_old[:self.nitems_unique].T) \
+                        * self.prim_vec[self.serial_position] \
+                        * np.mean(self.att_vec[self.all_nos_unique[item_idx]-1])
+                else:
+                    self.M_FC[:self.nitems_unique,:self.nitems_unique] \
+                        += self.L_FC[:self.nitems_unique,:self.nitems_unique] \
+                        * np.dot(self.c_old[:self.nitems_unique], self.f[:self.nitems_unique].T)
+                    self.M_CF[:self.nitems_unique,:self.nitems_unique] \
+                        += self.L_CF[:self.nitems_unique,:self.nitems_unique] \
+                        * np.dot(self.f[:self.nitems_unique], self.c_old[:self.nitems_unique].T)
+                if paired_pres: # [bj] pair association
+                    pair_ass = self.params['d_ass'] * np.dot(self.f, self.f.T)
+                    np.fill_diagonal(pair_ass, 0)
+                    self.M_FC += self.L_FC * pair_ass
+                    self.M_CF += self.L_CF * self.prim_vec[self.serial_position] * pair_ass
+
+
+    def simulate_recall(self, time_limit=60000, max_recalls=np.inf):
+        """
+        Simulate a recall period, starting from the current state of context.
+        [Unchanged from CMR2]
+
+        :param time_limit: The simulated duration of the recall period (in ms).
+            Determines how many cycles of the leaky accumulator will run before
+            the recall period ends. (DEFAULT=60000)
+        :param max_recalls: The maximum number of retrievals (not overt recalls)
+            that the model is permitted to make. If this limit is reached, the
+            recall period will end early. Use this setting to prevent the model
+            from eating up runtime if its parameter set causes it to make
+            hundreds of recalls per trial. (DEFAULT=np.inf)
+        """
+        cycles_elapsed = 0
+        nrecalls = 0
+        max_cycles = time_limit // self.params['dt']
+
+        while cycles_elapsed < max_cycles and nrecalls < max_recalls:
+            # Use context to cue items
+            f_in = np.dot(self.M_CF, self.c)[:self.nitems_unique].flatten()
+
+            # Identify set of items with the highest activation
+            top_items = np.argsort(f_in)[self.nitems_unique-self.nitems_in_race:]
+            top_activation = f_in[top_items]
+            top_activation[top_activation < 0] = 0
+
+            # Run accumulator until an item is retrieved
+            winner_idx, ncycles = self.leaky_accumulator(top_activation, self.ret_thresh[top_items], int(max_cycles - cycles_elapsed))
+            # Update elapsed time
+            cycles_elapsed += ncycles
+            nrecalls += 1
+
+            # Perform the following steps only if an item was retrieved
+            if winner_idx != -1:
+
+                # Identify the feature index of the retrieved item
+                item = top_items[winner_idx]
+
+                # Decay retrieval thresholds, then set the retrieved item's threshold to maximum
+                self.ret_thresh = 1 + self.params['alpha'] * (self.ret_thresh - 1)
+                self.ret_thresh[item] = 1 + self.params['omega']
+
+                # Present retrieved item to the model, with no source information
+                if self.learn_while_retrieving:
+                    self.present_item(item, source=None, update_context=True, update_weights=True)
+                else:
+                    self.present_item(item, source=None, update_context=True, update_weights=False)
+
+                # Filter intrusions using temporal context comparison, and log item if overtly recalled
+                c_similarity = np.dot(self.c_old[:self.ntemporal].T, self.c_in[:self.ntemporal])
+                if c_similarity >= self.params['c_thresh']:
+                    rec_itemno = self.all_nos_unique[item] # [bj]
+                    self.rec_items[-1].append(rec_itemno)
+                    self.rec_times[-1].append(cycles_elapsed * self.params['dt'])
+
+
+    def simulate_recog(self, cue_idx):
+        """
+        Simulate a recognition. [Newly added by Beige]
+
+        :param cue_idx: The index of the provided cue in the feature vector.
+        """
+        # Present cue and update the context
+        paired_cue = np.logical_not(np.isscalar(cue_idx))
+        if self.mode == "Final":
+            self.present_item(cue_idx, source=None, update_context=True, update_weights=False)
+        elif self.mode == "Continuous":
+            self.present_item(cue_idx, source=None, update_context=False, update_weights=False)
+        elif self.mode == "Hockley" or self.mode == "Recog-CR" or self.mode == "Recog-Recog" or self.mode == "CR-Recog":
+            if paired_cue: # pair cue
+                self.present_item(cue_idx[0], source=None, update_context=True, update_weights=False)
+                self.present_item(cue_idx[1], source=None, update_context=True, update_weights=False)
+                # self.present_item(cue_idx, source=None, update_context=True, update_weights=False)
+            else:
+                self.present_item(cue_idx, source=None, update_context=True, update_weights=False)
+
+        # Recognize or not using context similarity
+        # c_similarity, rt = self.diffusion(self.c_old[:self.nitems_unique], self.c_in[:self.nitems_unique], max_time=self.params['rec_time_limit'])
+        c_similarity = np.dot(self.c_old[:self.nitems_unique].T, self.c_in[:self.nitems_unique]) # !! similarity should not include distractors
+        rt = self.params['a'] * np.exp(-1 * self.params['b'] * np.abs(c_similarity - self.params['c_thresh_itm'])) # !!
+        self.recog_similarity.append(c_similarity.item())
+        self.rec_times.append(rt.item())
+
+        if paired_cue:
+            thresh = self.params['c_thresh_ass'] + self.thresh_rng.uniform(-self.thresh_sigma, self.thresh_sigma)
+        else:
+            thresh = self.c_vec[self.all_nos_unique[cue_idx] - 1] + self.thresh_rng.uniform(-self.thresh_sigma, self.thresh_sigma)
+
+        if c_similarity >= thresh:
+            self.rec_items.append(1)  # YES
+            if self.learn_while_retrieving:
+                self.beta = self.params['beta_rec']
+                self.present_item(cue_idx, source=None, update_context=False, update_weights=True)
+        else:
+            self.rec_items.append(0)  # NO
+#            if self.learn_while_retrieving:
+#                self.beta = self.params['beta_rec']
+#                self.present_item(cue_idx, source=None, update_context=False, update_weights=True)
+
+
+    def simulate_cr(self, cue_idx, time_limit=5000):
+        """
+        Simulate a cued recall. [Newly added by Beige]
+
+        :param cue_idx: The index of the provided cue in the feature vector.
+        :param time_limit: The simulated duration of the recall period (in ms).
+            Determines how many cycles of the leaky accumulator will run before
+            the recall period ends. (DEFAULT=5000)
+        """
+        cycles_elapsed = 0
+        max_cycles = time_limit // self.params['dt']
+
+        # present cue and update the context
+        self.present_item(cue_idx, source=None, update_context=True, update_weights=False)
+        if not np.isinf(self.ret_thresh[cue_idx]):
+            self.ret_thresh[cue_idx] = 1 + self.params['omega']  # can't recall the cue!
+
+        # Use context to cue items
+        f_in = np.dot(self.M_CF, self.c)[:self.nitems_unique].flatten()
+        self.f_in_acc.append(f_in)  # for test
+        self.f_in_dif.append(f_in - self.ret_thresh)  # for test, distance to threshold
+
+        # Identify set of items with the highest activation
+        # jbg: argsort returns the original index of the sorted order
+        top_items = np.argsort(f_in)[self.nitems_unique - self.nitems_in_race:]
+        if self.params['No_recall'] is not None: #!!
+            top_items = [x for x in top_items if x not in self.params['No_recall']]
+        top_activation = f_in[top_items]
+        top_activation[top_activation < 0] = 0
+
+        # Run accumulator until an item is retrieved
+        # jbg: winnder_idx is the index with in top_activation
+        winner_idx, ncycles = self.leaky_accumulator(top_activation, self.ret_thresh[top_items],
+                                                     int(max_cycles))
+        cycles_elapsed += ncycles
+
+        # Perform the following steps only if an item was retrieved
+        if winner_idx != -1:
+
+            # Identify the feature index of the retrieved item
+            item = top_items[winner_idx]
+
+            # Decay retrieval thresholds            
+            self.ret_thresh = 1 + self.params['alpha'] * (self.ret_thresh - 1)
+
+            # Present retrieved item to the model, with no source information
+            self.beta = self.params['beta_rec']
+            self.present_item(item, source=None, update_context=True, update_weights=False)
+
+            # Filter intrusions using temporal context comparison, and log item if overtly recalled
+            c_similarity = np.dot(self.c_old[:self.ntemporal].T, self.c_in[:self.ntemporal])
+            self.recog_similarity.append(c_similarity.item())
+            if c_similarity >= self.params['c_thresh']:
+
+                # Set the retrieved item's threshold to maximum
+                if not np.isinf(self.ret_thresh[item]):
+                    self.ret_thresh[item] = 1 + self.params['omega']
+
+                # Learn while retrieving
+                if self.learn_while_retrieving:
+                    self.present_item([item,cue_idx], source=None, update_context=False, update_weights=True)
+
+                rec_itemno = self.all_nos_unique[item] #[bj]
+                self.rec_items.append(rec_itemno)
+                self.rec_times.append(cycles_elapsed * self.params['dt'])
+            else:
+                self.rec_items.append(-2) # reject
+                self.rec_times.append(-2)
+
+        else:
+            self.rec_items.append(-1) # fail
+            self.rec_times.append(-1)
+            self.recog_similarity.append(-1)
+        
+        # print("after cr c:", self.c)
+        # print("after cr beta:", self.beta)
+
+
+    def diffusion(self, c1, c2, max_time=5000):
+        """
+        An experimental mechanism to calculate RT. Not used for now. [Newly added by Beige]
+        """
+        if len(c1) != len(c2):
+            print('err')
+        len_c = len(c1)
+
+        dt = self.params['dt']
+        dot_order = np.random.permutation(len_c)
+        total_time = 0
+        c_similarity = 0
+
+        for i in dot_order:
+            if total_time > max_time:
+                total_time = max_time
+                break
+
+            c_similarity += c1[i] * c2[i]
+            total_time += dt
+
+            if c_similarity >= self.params['c_thresh']:
+                break
+
+        return c_similarity, total_time
+
+
+    @cython.boundscheck(False)  # Deactivate bounds checking
+    @cython.wraparound(False)   # Deactivate negative indexing
+    @cython.cdivision(True)  # Skip checks for division by zero
+    def leaky_accumulator(self, float [:] in_act, float [:] x_thresholds, Py_ssize_t max_cycles):
+        """
+        Simulates the item retrieval process using a leaky accumulator. Loops
+        until an item is retrieved or the recall period ends. [Unchanged from CMR2]
+
+        :param in_act: A 1D array containing the incoming activation values
+            for all items in the competition.
+        :param x_thresholds: A 1D array containing the activation thresholds
+            required to retrieve each item in the competition.
+        :param max_cycles: The maximum number of cycles the accumulator can run
+            before the recall period ends.
+
+        :returns: The index of the retrieved item (or -1 if no item was
+            retrieved) and the number of cycles that elapsed before retrieval.
+        """
+        # Set up indexes
+        cdef Py_ssize_t i, j, cycle = 0
+        cdef Py_ssize_t nitems_in_race = in_act.shape[0]
+
+        # Set up time constants
+        cdef float dt_tau = self.params['dt_tau']
+        cdef float sq_dt_tau = self.params['sq_dt_tau']
+
+        # Pre-scale decay rate (kappa) based on dt
+        cdef float kappa = self.params['kappa']
+        kappa *= dt_tau
+        # Pre-scale inhibition (lambda) based on dt
+        cdef float lamb = self.params['lamb']
+        lamb *= dt_tau
+        # Take sqrt(eta) and pre-scale it based on sqrt(dt_tau)
+        # Note that we do this because (for cythonization purposes) we multiply the noise
+        # vector by sqrt(eta), rather than directly setting the SD to eta
+        cdef float eta = self.params['eta'] ** .5
+        eta *= sq_dt_tau
+        # Pre-scale incoming activation based on dt
+        np_in_act_scaled = np.empty(nitems_in_race, dtype=np.float32)
+        cdef float [:] in_act_scaled = np_in_act_scaled
+        for i in range(nitems_in_race):
+            in_act_scaled[i] = in_act[i] * dt_tau
+
+        # Set up activation variables
+        np_x = np.zeros(nitems_in_race, dtype=np.float32)
+        cdef float [:] x = np_x
+        cdef float act
+        cdef float sum_x
+        cdef float delta_x
+        cdef double [:] noise_vec
+
+        # Set up winner variables
+        cdef int has_retrieved_item = 0
+        cdef int nwinners = 0
+        np_retrieved = np.zeros(nitems_in_race, dtype=np.int32)
+        cdef int [:] retrieved = np_retrieved
+        cdef int [:] winner_vec
+        cdef int winner
+        cdef (int, int) winner_and_cycle
+
+        # Loop accumulator until retrieving an item or running out of time
+        while cycle < max_cycles and not has_retrieved_item:
+
+            # Compute sum of activations for lateral inhibition
+            sum_x = 0
+            i = 0
+            while i < nitems_in_race:
+                sum_x += x[i]
+                i += 1
+
+            # Update activation and check whether any items were retrieved
+            noise_vec = cython_randn(nitems_in_race)
+            i = 0
+            while i < nitems_in_race:
+                # Note that kappa, lambda, eta, and in_act have all been pre-scaled above based on dt
+                x[i] += in_act_scaled[i] + (eta * noise_vec[i]) - (kappa * x[i]) - (lamb * (sum_x - x[i]))
+                x[i] = max(x[i], 0)
+                if x[i] >= x_thresholds[i]:
+                    has_retrieved_item = 1
+                    nwinners += 1
+                    retrieved[i] = 1
+                    winner = i
+                i += 1
+
+            cycle += 1
+
+        # If no items were retrieved, set winner to -1
+        if nwinners == 0:
+            winner = -1
+        # If multiple items crossed the retrieval threshold on the same cycle, choose one randomly
+        elif nwinners > 1:
+            winner_vec = np.zeros(nwinners, dtype=np.int32)
+            i = 0
+            j = 0
+            while i < nitems_in_race:
+                if retrieved[i] == 1:
+                    winner_vec[j] = i
+                    j += 1
+                i += 1
+            # srand(time.time())
+            rand_idx = rand() % nwinners  # see http://www.delorie.com/djgpp/doc/libc/libc_637.html
+            winner = winner_vec[rand_idx]
+        # If only one item crossed the retrieval threshold, we already set it as the winner above
+
+        # Return winning item's index within in_act, as well as the number of cycles elapsed
+        winner_and_cycle = (winner, cycle)
+        return winner_and_cycle
+
     def run_fr_trial(self):
         """
         Simulates an entire standard trial, consisting of the following steps:
@@ -669,6 +1112,7 @@ class CMR2(object):
                         cue_idx = self.cues_indexes[self.cue_position]
                         self.simulate_recog(cue_idx)
 
+
     def run_conti_recog_single_sess(self):
         """
         Simulates a session of continuous recognition, consisting of the following steps:
@@ -710,7 +1154,7 @@ class CMR2(object):
                     self.beta_source = 0
                     if np.logical_not(np.isscalar(pres_idx)) and pres_idx[1] == -1:
                         pres_idx = pres_idx[0].astype(int)
-                    self.present_item(pres_idx, source, update_context=True, update_weights=True)
+                    self.present_item(pres_idx, source, update_context=True, update_weights=True, use_new_context=self.params['use_new_context'])
 
                 if self.phase == 'recognition':
                     #####
@@ -779,6 +1223,7 @@ class CMR2(object):
                         self.beta = self.params['beta_cue']
                         self.beta_source = 0
                         self.simulate_cr(cue_idx)
+
 
     def run_success_single_sess(self):
         """
@@ -886,431 +1331,6 @@ class CMR2(object):
                         self.beta = self.params['beta_cue']
                         self.beta_source = 0
                         self.simulate_cr(cue_idx)  # should be scalar
-
-    def present_item(self, item_idx, source=None, update_context=True, update_weights=True):
-        """
-        Presents a single item (or distractor) to the model by updating the
-        feature vector. Also provides options to update context and the model's
-        associative matrices after presentation. [Modified by Beige]
-
-        :param item_idx: The index of the cell within the feature vector that
-            should be activated by the presented item. If None, presents an
-            empty feature vector.
-        :param source: If None, no source features will be activated. If a 1D
-            array, the source features in the feature vector will be set to
-            match the numbers in the source array.
-        :param update_context: If True, the context vector will update after
-            the feature vector has been updated. If False, the feature vector
-            will update but the context vector will not change.
-        :param update_weights: If True, the model's weight matrices will update
-            to strengthen the association between the presented item and the
-            state of context at the time of presentation. If False, no learning
-            will occur after item presentation.
-        """
-        ##########
-        #
-        # Activate item's features
-        #
-        ##########
-
-        paired_pres = np.logical_not(np.isscalar(item_idx))
-
-        # Activate the presented item itself
-        self.f.fill(0)
-        if item_idx is not None:
-            self.f[item_idx] = 1
-
-        # Activate the source feature(s) of the presented item
-        if self.nsources > 0 and source is not None:
-            self.f[self.first_source_idx:, 0] = np.atleast_1d(source)
-
-        # copy c_old
-        # [bj] put this out of update context
-        self.c_old = self.c.copy()
-
-        # Compute c_in
-        self.c_in = np.dot(self.M_FC, self.f)
-
-        # Normalize the temporal and source subregions of c_in separately
-        norm_t = np.sqrt(np.sum(self.c_in[:self.ntemporal] ** 2))
-        if norm_t != 0:
-            self.c_in[:self.ntemporal] /= norm_t
-        if self.nsources > 0:
-            norm_s = np.sqrt(np.sum(self.c_in[self.ntemporal:] ** 2))
-            if norm_s != 0:
-                self.c_in[self.ntemporal:] /= norm_s
-
-        ##########
-        #
-        # Update context
-        #
-        ##########
-
-        if update_context:
-
-            # Set beta separately for temporal and source subregions
-            beta_vec = np.empty_like(self.c)
-            beta_vec[:self.ntemporal] = self.beta
-            beta_vec[self.ntemporal:] = self.beta_source
-
-            # Calculate rho for the temporal and source subregions
-            rho_vec = np.empty_like(self.c)
-            c_dot_t = np.dot(self.c[:self.ntemporal].T, self.c_in[:self.ntemporal])
-            rho_vec[:self.ntemporal] = math.sqrt(1 + self.beta ** 2 * (c_dot_t ** 2 - 1)) - self.beta * c_dot_t
-            c_dot_s = np.dot(self.c[self.ntemporal:].T, self.c_in[self.ntemporal:])
-            rho_vec[self.ntemporal:] = math.sqrt(1 + self.beta_source ** 2 * (c_dot_s ** 2 - 1)) - self.beta_source * c_dot_s
-
-            # Update context
-            self.c = (rho_vec * self.c_old) + (beta_vec * self.c_in)
-
-        ##########
-        #
-        # Update weight matrices
-        #
-        ##########
-
-        if update_weights:
-            # self.M_FC += self.L_FC * np.dot(self.c_old, self.f.T)
-            # [bj] to minimize computation load
-            # if self.task == 'FR':
-            #     if self.phase == 'encoding':  # Only apply primacy scaling during encoding
-            #         self.M_CF += self.L_CF * self.prim_vec[self.serial_position] * np.dot(self.f, self.c_old.T)
-            #     else:
-            #         self.M_CF += self.L_CF * np.dot(self.f, self.c_old.T)
-            if self.phase == 'encoding': # [bj] Only apply elevated-attention scaling during encoding
-                self.M_FC[:self.nitems_unique,:self.nitems_unique] \
-                    += self.L_FC[:self.nitems_unique,:self.nitems_unique] \
-                       * np.dot(self.c_old[:self.nitems_unique], self.f[:self.nitems_unique].T) \
-                       * np.mean(self.att_vec[self.all_nos_unique[item_idx]-1])
-                self.M_CF[:self.nitems_unique,:self.nitems_unique] \
-                    += self.L_CF[:self.nitems_unique,:self.nitems_unique] \
-                       * np.dot(self.f[:self.nitems_unique], self.c_old[:self.nitems_unique].T) \
-                       * self.prim_vec[self.serial_position] \
-                       * np.mean(self.att_vec[self.all_nos_unique[item_idx]-1])
-            else:
-                self.M_FC[:self.nitems_unique,:self.nitems_unique] \
-                    += self.L_FC[:self.nitems_unique,:self.nitems_unique] \
-                       * np.dot(self.c_old[:self.nitems_unique], self.f[:self.nitems_unique].T)
-                self.M_CF[:self.nitems_unique,:self.nitems_unique] \
-                    += self.L_CF[:self.nitems_unique,:self.nitems_unique] \
-                       * np.dot(self.f[:self.nitems_unique], self.c_old[:self.nitems_unique].T)
-            if paired_pres: # [bj] pair association
-                pair_ass = self.params['d_ass'] * np.dot(self.f, self.f.T)
-                np.fill_diagonal(pair_ass, 0)
-                self.M_FC += self.L_FC * pair_ass
-                self.M_CF += self.L_CF * self.prim_vec[self.serial_position] * pair_ass
-
-    def simulate_recall(self, time_limit=60000, max_recalls=np.inf):
-        """
-        Simulate a recall period, starting from the current state of context.
-        [Unchanged from CMR2]
-
-        :param time_limit: The simulated duration of the recall period (in ms).
-            Determines how many cycles of the leaky accumulator will run before
-            the recall period ends. (DEFAULT=60000)
-        :param max_recalls: The maximum number of retrievals (not overt recalls)
-            that the model is permitted to make. If this limit is reached, the
-            recall period will end early. Use this setting to prevent the model
-            from eating up runtime if its parameter set causes it to make
-            hundreds of recalls per trial. (DEFAULT=np.inf)
-        """
-        cycles_elapsed = 0
-        nrecalls = 0
-        max_cycles = time_limit // self.params['dt']
-
-        while cycles_elapsed < max_cycles and nrecalls < max_recalls:
-            # Use context to cue items
-            f_in = np.dot(self.M_CF, self.c)[:self.nitems_unique].flatten()
-
-            # Identify set of items with the highest activation
-            top_items = np.argsort(f_in)[self.nitems_unique-self.nitems_in_race:]
-            top_activation = f_in[top_items]
-            top_activation[top_activation < 0] = 0
-
-            # Run accumulator until an item is retrieved
-            winner_idx, ncycles = self.leaky_accumulator(top_activation, self.ret_thresh[top_items], int(max_cycles - cycles_elapsed))
-            # Update elapsed time
-            cycles_elapsed += ncycles
-            nrecalls += 1
-
-            # Perform the following steps only if an item was retrieved
-            if winner_idx != -1:
-
-                # Identify the feature index of the retrieved item
-                item = top_items[winner_idx]
-
-                # Decay retrieval thresholds, then set the retrieved item's threshold to maximum
-                self.ret_thresh = 1 + self.params['alpha'] * (self.ret_thresh - 1)
-                self.ret_thresh[item] = 1 + self.params['omega']
-
-                # Present retrieved item to the model, with no source information
-                if self.learn_while_retrieving:
-                    self.present_item(item, source=None, update_context=True, update_weights=True)
-                else:
-                    self.present_item(item, source=None, update_context=True, update_weights=False)
-
-                # Filter intrusions using temporal context comparison, and log item if overtly recalled
-                c_similarity = np.dot(self.c_old[:self.ntemporal].T, self.c_in[:self.ntemporal])
-                if c_similarity >= self.params['c_thresh']:
-                    rec_itemno = self.all_nos_unique[item] # [bj]
-                    self.rec_items[-1].append(rec_itemno)
-                    self.rec_times[-1].append(cycles_elapsed * self.params['dt'])
-
-    def simulate_recog(self, cue_idx):
-        """
-        Simulate a recognition. [Newly added by Beige]
-
-        :param cue_idx: The index of the provided cue in the feature vector.
-        """
-        # Present cue and update the context
-        paired_cue = np.logical_not(np.isscalar(cue_idx))
-        if self.mode == "Final":
-            self.present_item(cue_idx, source=None, update_context=True, update_weights=False)
-        elif self.mode == "Continuous":
-            self.present_item(cue_idx, source=None, update_context=False, update_weights=False)
-        elif self.mode == "Hockley" or self.mode == "Recog-CR" or self.mode == "Recog-Recog" or self.mode == "CR-Recog":
-            if paired_cue: # pair cue
-                self.present_item(cue_idx[0], source=None, update_context=True, update_weights=False)
-                self.present_item(cue_idx[1], source=None, update_context=True, update_weights=False)
-                # self.present_item(cue_idx, source=None, update_context=True, update_weights=False)
-            else:
-                self.present_item(cue_idx, source=None, update_context=True, update_weights=False)
-
-        # Recognize or not using context similarity
-        # c_similarity, rt = self.diffusion(self.c_old[:self.nitems_unique], self.c_in[:self.nitems_unique], max_time=self.params['rec_time_limit'])
-        c_similarity = np.dot(self.c_old[:self.nitems_unique].T, self.c_in[:self.nitems_unique]) # !! similarity should not include distractors
-        rt = self.params['a'] * np.exp(-1 * self.params['b'] * np.abs(c_similarity - self.params['c_thresh_itm'])) # !!
-        self.recog_similarity.append(c_similarity.item())
-        self.rec_times.append(rt.item())
-
-        if paired_cue:
-            thresh = self.params['c_thresh_ass'] + self.thresh_rng.uniform(-self.thresh_sigma, self.thresh_sigma)
-        else:
-            thresh = self.c_vec[self.all_nos_unique[cue_idx] - 1] + self.thresh_rng.uniform(-self.thresh_sigma, self.thresh_sigma)
-
-        if c_similarity >= thresh:
-            self.rec_items.append(1)  # YES
-            if self.learn_while_retrieving:
-                self.beta = self.params['beta_rec']
-                self.present_item(cue_idx, source=None, update_context=False, update_weights=True)
-        else:
-            self.rec_items.append(0)  # NO
-#            if self.learn_while_retrieving:
-#                self.beta = self.params['beta_rec']
-#                self.present_item(cue_idx, source=None, update_context=False, update_weights=True)
-
-    def simulate_cr(self, cue_idx, time_limit=5000):
-        """
-        Simulate a cued recall. [Newly added by Beige]
-
-        :param cue_idx: The index of the provided cue in the feature vector.
-        :param time_limit: The simulated duration of the recall period (in ms).
-            Determines how many cycles of the leaky accumulator will run before
-            the recall period ends. (DEFAULT=5000)
-        """
-        cycles_elapsed = 0
-        max_cycles = time_limit // self.params['dt']
-
-        # present cue and update the context
-        self.present_item(cue_idx, source=None, update_context=True, update_weights=False)
-        if not np.isinf(self.ret_thresh[cue_idx]):
-            self.ret_thresh[cue_idx] = 1 + self.params['omega']  # can't recall the cue!
-
-        # Use context to cue items
-        f_in = np.dot(self.M_CF, self.c)[:self.nitems_unique].flatten()
-        self.f_in_acc.append(f_in)  # for test
-        self.f_in_dif.append(f_in - self.ret_thresh)  # for test, distance to threshold
-
-        # Identify set of items with the highest activation
-        # jbg: argsort returns the original index of the sorted order
-        top_items = np.argsort(f_in)[self.nitems_unique - self.nitems_in_race:]
-        if self.params['No_recall'] is not None: #!!
-            top_items = [x for x in top_items if x not in self.params['No_recall']]
-        top_activation = f_in[top_items]
-        top_activation[top_activation < 0] = 0
-
-        # Run accumulator until an item is retrieved
-        # jbg: winnder_idx is the index with in top_activation
-        winner_idx, ncycles = self.leaky_accumulator(top_activation, self.ret_thresh[top_items],
-                                                     int(max_cycles))
-        cycles_elapsed += ncycles
-
-        # Perform the following steps only if an item was retrieved
-        if winner_idx != -1:
-
-            # Identify the feature index of the retrieved item
-            item = top_items[winner_idx]
-
-            # Decay retrieval thresholds            
-            self.ret_thresh = 1 + self.params['alpha'] * (self.ret_thresh - 1)
-
-            # Present retrieved item to the model, with no source information
-            self.beta = self.params['beta_rec']
-            self.present_item(item, source=None, update_context=True, update_weights=False)
-
-            # Filter intrusions using temporal context comparison, and log item if overtly recalled
-            c_similarity = np.dot(self.c_old[:self.ntemporal].T, self.c_in[:self.ntemporal])
-            self.recog_similarity.append(c_similarity.item())
-            if c_similarity >= self.params['c_thresh']:
-
-                # Set the retrieved item's threshold to maximum
-                if not np.isinf(self.ret_thresh[item]):
-                    self.ret_thresh[item] = 1 + self.params['omega']
-
-                # Learn while retrieving
-                if self.learn_while_retrieving:
-                    self.present_item([item,cue_idx], source=None, update_context=False, update_weights=True)
-
-                rec_itemno = self.all_nos_unique[item] #[bj]
-                self.rec_items.append(rec_itemno)
-                self.rec_times.append(cycles_elapsed * self.params['dt'])
-            else:
-                self.rec_items.append(-2) # reject
-                self.rec_times.append(-2)
-
-        else:
-            self.rec_items.append(-1) # fail
-            self.rec_times.append(-1)
-            self.recog_similarity.append(-1)
-        
-        # print("after cr c:", self.c)
-        # print("after cr beta:", self.beta)
-
-
-    def diffusion(self, c1, c2,max_time=5000):
-        """
-        An experimental mechanism to calculate RT. Not used for now. [Newly added by Beige]
-        """
-        if len(c1) != len(c2):
-            print('err')
-        len_c = len(c1)
-
-        dt = self.params['dt']
-        dot_order = np.random.permutation(len_c)
-        total_time = 0
-        c_similarity = 0
-
-        for i in dot_order:
-            if total_time > max_time:
-                total_time = max_time
-                break
-
-            c_similarity += c1[i] * c2[i]
-            total_time += dt
-
-            if c_similarity >= self.params['c_thresh']:
-                break
-
-        return c_similarity, total_time
-
-
-    @cython.boundscheck(False)  # Deactivate bounds checking
-    @cython.wraparound(False)   # Deactivate negative indexing
-    @cython.cdivision(True)  # Skip checks for division by zero
-    def leaky_accumulator(self, float [:] in_act, float [:] x_thresholds, Py_ssize_t max_cycles):
-        """
-        Simulates the item retrieval process using a leaky accumulator. Loops
-        until an item is retrieved or the recall period ends. [Unchanged from CMR2]
-
-        :param in_act: A 1D array containing the incoming activation values
-            for all items in the competition.
-        :param x_thresholds: A 1D array containing the activation thresholds
-            required to retrieve each item in the competition.
-        :param max_cycles: The maximum number of cycles the accumulator can run
-            before the recall period ends.
-
-        :returns: The index of the retrieved item (or -1 if no item was
-            retrieved) and the number of cycles that elapsed before retrieval.
-        """
-        # Set up indexes
-        cdef Py_ssize_t i, j, cycle = 0
-        cdef Py_ssize_t nitems_in_race = in_act.shape[0]
-
-        # Set up time constants
-        cdef float dt_tau = self.params['dt_tau']
-        cdef float sq_dt_tau = self.params['sq_dt_tau']
-
-        # Pre-scale decay rate (kappa) based on dt
-        cdef float kappa = self.params['kappa']
-        kappa *= dt_tau
-        # Pre-scale inhibition (lambda) based on dt
-        cdef float lamb = self.params['lamb']
-        lamb *= dt_tau
-        # Take sqrt(eta) and pre-scale it based on sqrt(dt_tau)
-        # Note that we do this because (for cythonization purposes) we multiply the noise
-        # vector by sqrt(eta), rather than directly setting the SD to eta
-        cdef float eta = self.params['eta'] ** .5
-        eta *= sq_dt_tau
-        # Pre-scale incoming activation based on dt
-        np_in_act_scaled = np.empty(nitems_in_race, dtype=np.float32)
-        cdef float [:] in_act_scaled = np_in_act_scaled
-        for i in range(nitems_in_race):
-            in_act_scaled[i] = in_act[i] * dt_tau
-
-        # Set up activation variables
-        np_x = np.zeros(nitems_in_race, dtype=np.float32)
-        cdef float [:] x = np_x
-        cdef float act
-        cdef float sum_x
-        cdef float delta_x
-        cdef double [:] noise_vec
-
-        # Set up winner variables
-        cdef int has_retrieved_item = 0
-        cdef int nwinners = 0
-        np_retrieved = np.zeros(nitems_in_race, dtype=np.int32)
-        cdef int [:] retrieved = np_retrieved
-        cdef int [:] winner_vec
-        cdef int winner
-        cdef (int, int) winner_and_cycle
-
-        # Loop accumulator until retrieving an item or running out of time
-        while cycle < max_cycles and not has_retrieved_item:
-
-            # Compute sum of activations for lateral inhibition
-            sum_x = 0
-            i = 0
-            while i < nitems_in_race:
-                sum_x += x[i]
-                i += 1
-
-            # Update activation and check whether any items were retrieved
-            noise_vec = cython_randn(nitems_in_race)
-            i = 0
-            while i < nitems_in_race:
-                # Note that kappa, lambda, eta, and in_act have all been pre-scaled above based on dt
-                x[i] += in_act_scaled[i] + (eta * noise_vec[i]) - (kappa * x[i]) - (lamb * (sum_x - x[i]))
-                x[i] = max(x[i], 0)
-                if x[i] >= x_thresholds[i]:
-                    has_retrieved_item = 1
-                    nwinners += 1
-                    retrieved[i] = 1
-                    winner = i
-                i += 1
-
-            cycle += 1
-
-        # If no items were retrieved, set winner to -1
-        if nwinners == 0:
-            winner = -1
-        # If multiple items crossed the retrieval threshold on the same cycle, choose one randomly
-        elif nwinners > 1:
-            winner_vec = np.zeros(nwinners, dtype=np.int32)
-            i = 0
-            j = 0
-            while i < nitems_in_race:
-                if retrieved[i] == 1:
-                    winner_vec[j] = i
-                    j += 1
-                i += 1
-            # srand(time.time())
-            rand_idx = rand() % nwinners  # see http://www.delorie.com/djgpp/doc/libc/libc_637.html
-            winner = winner_vec[rand_idx]
-        # If only one item crossed the retrieval threshold, we already set it as the winner above
-
-        # Return winning item's index within in_act, as well as the number of cycles elapsed
-        winner_and_cycle = (winner, cycle)
-        return winner_and_cycle
 
 
 ##########
@@ -1446,6 +1466,7 @@ def make_default_params():
         thresh_sigma = 0,
         var_enc = 1,
         bad_enc_ratio = 1,
+        use_new_context = False,
     )
 
     return param_dict
@@ -1779,7 +1800,7 @@ def run_conti_recog_multi_sess(params, df, sem_mat, source_mat=None, task='Recog
     df_thin = df[['session','position','study_itemno1','study_itemno2','test_itemno1','test_itemno2']]
     df_thin = df_thin.assign(s_resp=np.nan, s_rt=np.nan, csim=np.nan)
 
-    for sess in sessions:
+    for sess in tqdm(sessions):
         # extarct the session data
         pres_mat = df_thin.loc[df_thin.session == sess, ['study_itemno1', 'study_itemno2']].to_numpy()
         pres_mat = np.reshape(pres_mat, (len(pres_mat), 1, 2))
