@@ -687,33 +687,6 @@ class CMR2(object):
         # print("after cr beta:", self.beta)
 
 
-    def diffusion(self, c1, c2, max_time=5000):
-        """
-        An experimental mechanism to calculate RT. Not used for now. [Newly added by Beige]
-        """
-        if len(c1) != len(c2):
-            print('err')
-        len_c = len(c1)
-
-        dt = self.params['dt']
-        dot_order = np.random.permutation(len_c)
-        total_time = 0
-        c_similarity = 0
-
-        for i in dot_order:
-            if total_time > max_time:
-                total_time = max_time
-                break
-
-            c_similarity += c1[i] * c2[i]
-            total_time += dt
-
-            if c_similarity >= self.params['c_thresh']:
-                break
-
-        return c_similarity, total_time
-
-
     @cython.boundscheck(False)  # Deactivate bounds checking
     @cython.wraparound(False)   # Deactivate negative indexing
     @cython.cdivision(True)  # Skip checks for division by zero
@@ -821,6 +794,34 @@ class CMR2(object):
         # Return winning item's index within in_act, as well as the number of cycles elapsed
         winner_and_cycle = (winner, cycle)
         return winner_and_cycle
+
+
+    # def diffusion(self, c1, c2, max_time=5000):
+    #     """
+    #     An experimental mechanism to calculate RT. Not used for now. [Newly added by Beige]
+    #     """
+    #     if len(c1) != len(c2):
+    #         print('err')
+    #     len_c = len(c1)
+
+    #     dt = self.params['dt']
+    #     dot_order = np.random.permutation(len_c)
+    #     total_time = 0
+    #     c_similarity = 0
+
+    #     for i in dot_order:
+    #         if total_time > max_time:
+    #             total_time = max_time
+    #             break
+
+    #         c_similarity += c1[i] * c2[i]
+    #         total_time += dt
+
+    #         if c_similarity >= self.params['c_thresh']:
+    #             break
+
+    #     return c_similarity, total_time
+
 
     def run_fr_trial(self):
         """
@@ -1091,7 +1092,7 @@ class CMR2(object):
                         pres_idx = self.pres_indexes[self.trial_idx, self.serial_position] # [bj] if word-pair, give a pair
                         self.beta = self.params['beta_enc']
                         self.beta_source = 0
-                        self.present_item(pres_idx, source, update_context=True, update_weights=True)
+                        self.present_item(pres_idx, source, update_context=True, update_weights=True, use_new_context=self.params['use_new_context'])
 
                 if self.phase == 'prerecall':
                     #####
