@@ -1204,7 +1204,7 @@ class CMR2(object):
                         pres_idx = self.pres_indexes[trial_idx, self.serial_position]
                         self.beta = self.params['beta_enc']
                         self.beta_source = 0
-                        self.present_item(pres_idx, source, update_context=True, update_weights=True)
+                        self.present_item(pres_idx, source, update_context=True, update_weights=True, use_new_context=self.params['use_new_context'])
 
                 if self.phase == 'prerecall':
                     #####
