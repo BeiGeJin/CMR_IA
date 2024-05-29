@@ -216,7 +216,7 @@ def obj_func_6b(param_vec, df_study, df_test, sem_mat, sources):
     param_dict = param_vec_to_dict(param_vec, sim_name = '6b')
     
     # Run model with the parameters given in param_vec
-    param_dict.update(learn_while_retrieving=True, nitems_in_accumulator = 96)
+    param_dict.update(learn_while_retrieving=True, nitems_in_accumulator = 96, use_new_context = True)
     df_simu, _, _ = cmr.run_success_multi_sess(param_dict, df_study, df_test, sem_mat, mode="CR-CR")
     df_simu['test_pos'] = np.tile(np.arange(1,25),600)  # 100 * 6
     df_simu = df_simu.merge(df_test,on=['session','list', 'test_itemno1','test_itemno2', 'test_pos'])

@@ -504,8 +504,8 @@ def run_pso(df_study, df_test, sem_mat, sources, sim_name=''):
 
     # Set PSO parameters
     alg = 'pso2'
-    swarmsize = 500
-    n_iter = 200
+    swarmsize = 100
+    n_iter = 100
     omega_min = .72984 if alg in ('pso2', 'awl') else .3 if alg == 'apso6' else .4
     omega_max = .72984 if alg in ('pso2', 'awl') else .9
     d_omega = .1  # Delta omega for apso6 algorithm
@@ -546,9 +546,9 @@ def run_pso(df_study, df_test, sem_mat, sources, sim_name=''):
 if __name__ == "__main__":
     
     # SIM = 'David'
-    SIM = 'S1'
+    # SIM = 'S1'
     # SIM = 'S2'
-    # SIM = '6b'
+    SIM = '6b'
     sem_file = '../../../Data/wordpools/ltp_FR_similarity_matrix.npy'
 
     if SIM == 'David':
@@ -576,6 +576,8 @@ if __name__ == "__main__":
         with open("../../../Analysis/simu6b_cr_sym/simu6b_data/simu6b_design.pkl", 'rb') as inp:
             df_study = pkl.load(inp)
             df_test = pkl.load(inp)
+        df_study = df_study.loc[df_study.session < 100]
+        df_test = df_test.loc[df_test.session < 100]
         sources = None
 
     else:

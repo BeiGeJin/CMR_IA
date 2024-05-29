@@ -553,7 +553,7 @@ class CMR2(object):
 
                 # Present retrieved item to the model, with no source information
                 if self.learn_while_retrieving:
-                    self.present_item(item, source=None, update_context=True, update_weights=True)
+                    self.present_item(item, source=None, update_context=True, update_weights=True, use_new_context=self.params['use_new_context'])  # [bj]
                 else:
                     self.present_item(item, source=None, update_context=True, update_weights=False)
 
@@ -601,7 +601,7 @@ class CMR2(object):
             self.rec_items.append(1)  # YES
             if self.learn_while_retrieving:
                 self.beta = self.params['beta_rec']
-                self.present_item(cue_idx, source=None, update_context=False, update_weights=True)
+                self.present_item(cue_idx, source=None, update_context=False, update_weights=True, use_new_context=self.params['use_new_context'])
         else:
             self.rec_items.append(0)  # NO
 #            if self.learn_while_retrieving:
@@ -669,7 +669,7 @@ class CMR2(object):
 
                 # Learn while retrieving
                 if self.learn_while_retrieving:
-                    self.present_item([item,cue_idx], source=None, update_context=False, update_weights=True)
+                    self.present_item([item,cue_idx], source=None, update_context=False, update_weights=True, use_new_context=self.params['use_new_context'])
 
                 rec_itemno = self.all_nos_unique[item] #[bj]
                 self.rec_items.append(rec_itemno)
@@ -867,7 +867,7 @@ class CMR2(object):
             source = self.sources[self.trial_idx, self.serial_position] if self.nsources > 0 else None
             self.beta = self.params['beta_enc']
             self.beta_source = self.params['beta_source'] if self.nsources > 0 else 0
-            self.present_item(pres_idx, source, update_context=True, update_weights=True)
+            self.present_item(pres_idx, source, update_context=True, update_weights=True, use_new_context=self.params['use_new_context'])  # [bj]
 
         ##########
         #
@@ -1299,7 +1299,7 @@ class CMR2(object):
                             elif enc_state == 0:
                                 self.L_FC.fill(self.params['gamma_fc'] * self.params['bad_enc_ratio'])
                                 self.L_CF.fill(self.params['gamma_cf'] * self.params['bad_enc_ratio'])
-                        self.present_item(pres_idx, source, update_context=True, update_weights=True)
+                        self.present_item(pres_idx, source, update_context=True, update_weights=True, use_new_context=self.params['use_new_context'])
                 
                 if self.phase == 'recognition':
                     #####
