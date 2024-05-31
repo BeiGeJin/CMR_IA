@@ -5,6 +5,7 @@ import time
 import pandas as pd
 import math
 import pickle
+import scipy as sp
 from optimization_utils import param_vec_to_dict
 
 def obj_func_S1(param_vec, df_study, df_test, sem_mat, sources, return_df=False):
@@ -297,6 +298,59 @@ def anal_perform_6b(df_simu):
     # print("Q: ", q)
 
     return t1_t2, t1_f2, f1_t2, f1_f2, q
+
+def obj_func_3(param_vec, df_study, df_test, sem_mat, sources):
+
+    assert df_study == None
+    df = df_test
+
+    # Reformat parameter vector to the dictionary format expected by CMR2
+    param_dict = param_vec_to_dict(param_vec, sim_name = '3')
+    param_dict.update(use_new_context = True)
+
+    # Run model with the parameters given in param_vec
+    df_simu = cmr.run_conti_recog_multi_sess(param_dict, df, sem_mat, mode="Hockley")
+    df_simu = df_simu.merge(df,on=['session','position','study_itemno1','study_itemno2','test_itemno1','test_itemno2'])
+
+    # group by type and lag
+    df_laggp = df_simu.groupby(['type','lag']).s_resp.mean().to_frame(name='yes_rate').reset_index()
+
+    # get d prime
+    df_dprime = pd.DataFrame()
+    df_dprime['lag'] = [2,4,6,8,16]
+    df_dprime['I_z_hr'] = sp.stats.norm.ppf(df_laggp.loc[df_laggp.type == 1, 'yes_rate'].astype(float))
+    df_dprime['I_z_far'] = np.mean(sp.stats.norm.ppf(df_laggp.loc[df_laggp.type == 0, 'yes_rate'].astype(float)))
+    df_dprime['I_dprime'] = df_dprime['I_z_hr'] - df_dprime['I_z_far']
+    df_dprime['A_z_hr'] = sp.stats.norm.ppf(df_laggp.loc[df_laggp.type == 2, 'yes_rate'].astype(float))
+    df_dprime['A_z_far'] = sp.stats.norm.ppf(df_laggp.loc[df_laggp.type == 3, 'yes_rate'].astype(float))
+    df_dprime['A_dprime'] = df_dprime['A_z_hr'] - df_dprime['A_z_far']
+
+    # get the vectors
+    I_hr = df_laggp.loc[df_laggp.type == 1, "yes_rate"].to_numpy()
+    A_hr = df_laggp.loc[df_laggp.type == 2, "yes_rate"].to_numpy()
+    I_dprime = df_dprime['I_dprime'].to_numpy()
+    A_dprime = df_dprime['A_dprime'].to_numpy()
+    # cut off I_dprime and A_dprime above 5 or below -5 to avoid inf
+    I_dprime = np.clip(I_dprime, -5, 5)
+    A_dprime = np.clip(A_dprime, -5, 5)
+
+    # ground truth
+    I_hr_gt = np.array([0.865, 0.811, 0.752, 0.746, 0.708])
+    A_hr_gt = np.array([0.843, 0.787, 0.720, 0.735, 0.646])
+    I_dprime_gt = np.array([2.31, 2.05, 1.85, 1.84, 1.68])
+    A_dprime_gt = np.array([1.36, 1.29, 1.37, 1.58, 1.39])
+
+    # calculate the error
+    err = np.mean(np.power(I_hr - I_hr_gt,2)) + np.mean(np.power(A_hr - A_hr_gt,2)) \
+        + np.mean(np.power(I_dprime - I_dprime_gt,2)) + np.mean(np.power(A_dprime - A_dprime_gt,2))
+    
+    cmr_stats = {}
+    cmr_stats['err'] = err
+    cmr_stats['params'] = param_vec
+    cmr_stats['stats'] = [I_hr, A_hr, I_dprime, A_dprime]
+
+    return err, cmr_stats
+
 
 # def obj_func(param_vec, df, w2v, sources, return_recalls=False, mode='RT_score'):
     

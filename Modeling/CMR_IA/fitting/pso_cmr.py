@@ -10,7 +10,7 @@ import pickle as pkl
 from glob import glob
 from noise_maker_pso import make_noise
 from optimization_utils import make_boundary
-from object_funcs import obj_func_S1, obj_func_S2, obj_func_6b
+from object_funcs import obj_func_S1, obj_func_S2, obj_func_6b, obj_func_3
 
 # Set where you want your noise files and output files to be saved
 global OUTDIR
@@ -526,6 +526,8 @@ def run_pso(df_study, df_test, sem_mat, sources, sim_name=''):
         func = obj_func_S2
     elif sim_name == '6b':
         func = obj_func_6b
+    elif sim_name == '3':
+        func = obj_func_3
     
     print('Generating noise files...')
     make_noise(swarmsize, n_iter, lb, ub, NOISE_DIR)
@@ -548,6 +550,7 @@ if __name__ == "__main__":
     # SIM = 'David'
     # SIM = 'S1'
     # SIM = 'S2'
+    SIM = '3'
     SIM = '6b'
     sem_file = '../../../Data/wordpools/ltp_FR_similarity_matrix.npy'
 
@@ -578,6 +581,13 @@ if __name__ == "__main__":
             df_test = pkl.load(inp)
         df_study = df_study.loc[df_study.session < 100]
         df_test = df_test.loc[df_test.session < 100]
+        sources = None
+    
+    elif SIM == '3':
+        with open("../../../Analysis/simu3_recog_forget/simu3_data/simu3_design.pkl", 'rb') as inp:
+            df_test = pkl.load(inp)
+        df_test = df_test.loc[df_test.session < 300]
+        df_study = None
         sources = None
 
     else:

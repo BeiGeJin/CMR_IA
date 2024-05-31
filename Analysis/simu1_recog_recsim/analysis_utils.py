@@ -42,30 +42,3 @@ def loftus_masson(df, sub_cols, cond_col, value_col, within_cols=[]):
     df['M_S'] = df.groupby(sub_cols + within_cols)[value_col].transform('mean')
     df['adj_' + value_col] = (df[value_col] + df['M'] - df['M_S'])
     return df
-
-def loglag_rollcat(df, resp_col):
-
-    df_rollcat_laggp = df.groupby(['subject_ID','roll_cat_len_level','log_lag_bin'])[resp_col].mean()
-    df_rollcat_laggp = df_rollcat_laggp.to_frame(name='hr').reset_index()
-    df_rollcat_laggp = au.loftus_masson(df_rollcat_laggp, 'subject_ID', ['roll_cat_len_level', 'log_lag_bin'], 'hr')
-    
-    df_rollcat_laggp = df_rollcat_laggp.loc[np.isin(df_rollcat_laggp.roll_cat_len_level,['0','>=2'])]
-    df_rollcat_laggp.roll_cat_len_level = df_rollcat_laggp.roll_cat_len_level.astype("category").cat.reorder_categories(['0', '>=2'])
-    
-    df_rollcat_laggp['log_lag_disp'] = np.e**df_rollcat_laggp.log_lag_bin
-    
-    display(df_rollcat_laggp)
-    
-    if resp_col == 's_resp':
-        ci = None
-        linestyle = '-'
-    else:
-        ci = 95
-        linestyle = '--'
-
-    g=sns.lineplot(data=df_rollcat_laggp, y='adj_hr', x='log_lag_disp', hue = 'roll_cat_len_level', ci=ci, linestyle='--', marker = 'o', markersize = 7)
-    g.set(ylabel='P("Yes" | Old)', xlabel='log_Lag')
-    
-    selected_lag = np.array([1,np.e,np.e**2,np.e**3,np.e**4,np.e**5])
-    plt.xticks(ticks=selected_lag, labels = ['1','e','e2','e3','e4','e5'])
-    plt.xlim([0,150])

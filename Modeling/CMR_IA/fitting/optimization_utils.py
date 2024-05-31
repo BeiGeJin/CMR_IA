@@ -186,6 +186,8 @@ def make_boundary(sim_name):
     elif sim_name == '6b':
         what_to_fit = ['beta_enc', 'beta_rec', 'beta_cue', 'beta_rec_post', 'beta_distract', 'gamma_fc', 'gamma_cf', 's_fc', 's_cf', 'phi_s', 'phi_d', 'kappa', 'lamb', 'eta', 'omega', 'alpha', 'c_thresh']
         # what_to_fit = ['beta_enc', 'beta_rec', 'beta_cue', 'beta_rec_post', 'beta_distract', 'gamma_fc', 'gamma_cf', 's_fc', 's_cf', 'phi_s', 'phi_d', 'kappa', 'lamb', 'eta', 'omega', 'alpha', 'c_thresh', 'd_ass']
+    elif sim_name == '3':
+        what_to_fit = ['beta_enc','beta_cue','beta_rec_post','s_fc','gamma_fc', 'c_thresh_itm', 'c_thresh_ass']
 
     lb = [lb_dict[key] for key in what_to_fit]
     ub = [ub_dict[key] for key in what_to_fit]
