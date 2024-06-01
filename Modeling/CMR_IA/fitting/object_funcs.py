@@ -333,6 +333,8 @@ def obj_func_3(param_vec, df_study, df_test, sem_mat, sources):
     # cut off I_dprime and A_dprime above 5 or below -5 to avoid inf
     I_dprime = np.clip(I_dprime, -5, 5)
     A_dprime = np.clip(A_dprime, -5, 5)
+    I_dprime[np.isnan(I_dprime)] = 10
+    A_dprime[np.isnan(A_dprime)] = 10
 
     # ground truth
     I_hr_gt = np.array([0.865, 0.811, 0.752, 0.746, 0.708])
@@ -341,8 +343,16 @@ def obj_func_3(param_vec, df_study, df_test, sem_mat, sources):
     A_dprime_gt = np.array([1.36, 1.29, 1.37, 1.58, 1.39])
 
     # calculate the error
-    err = np.mean(np.power(I_hr - I_hr_gt,2)) + np.mean(np.power(A_hr - A_hr_gt,2)) \
+    err = np.mean(np.power(I_hr - I_hr_gt,2)) * 10 + np.mean(np.power(A_hr - A_hr_gt,2)) * 10 \
         + np.mean(np.power(I_dprime - I_dprime_gt,2)) + np.mean(np.power(A_dprime - A_dprime_gt,2))
+
+    # apply some constraints
+    if not (I_dprime[0] > I_dprime[1] and I_dprime[1] > I_dprime[2] and I_dprime[2] > I_dprime[3] and I_dprime[3] > I_dprime[4]):
+        err += 1
+    if not (I_hr[0] > I_hr[1] and I_hr[1] > I_hr[2] and I_hr[2] > I_hr[3] and I_hr[3] > I_hr[4]):
+        err += 1
+    if not (I_hr > A_hr).all():
+        err += 1 
     
     cmr_stats = {}
     cmr_stats['err'] = err
