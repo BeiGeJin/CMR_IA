@@ -341,6 +341,16 @@ def obj_func_3(param_vec, df_study, df_test, sem_mat, sources):
     err = np.mean(np.power(I_hr - I_hr_gt, 2)) + np.mean(np.power(A_hr - A_hr_gt, 2)) \
         + np.power(I_far - I_far_gt, 2) * 5 + np.mean(np.power(A_far - A_far_gt, 2))
     
+    # apply some constraints
+    if not (I_hr[0] > I_hr[1] and I_hr[1] > I_hr[2] and I_hr[2] > I_hr[3] and I_hr[3] > I_hr[4]):
+        err += 1
+    if not (A_hr[0] > A_hr[1] and A_hr[1] > A_hr[2] and A_hr[2] > A_hr[3] and A_hr[3] > A_hr[4]):
+        err += 1
+    if not (I_hr > A_hr).all():
+        err += 1
+    if not (A_far[0] > A_far[1] and A_far[1] > A_far[2] and A_far[2] > A_far[3] and A_far[3] > A_far[4]):
+        err += 1 
+
     cmr_stats = {}
     cmr_stats['err'] = err
     cmr_stats['params'] = param_vec
