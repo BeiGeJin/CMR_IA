@@ -225,7 +225,8 @@ class CMR2(object):
         ### [bj] end
         
         # [bj] semantic mean across all possible items (for attention and criterion-shift) 
-        self.sem_mean = np.mean(self.sem_mat, axis=1)
+        # self.sem_mean = np.mean(self.sem_mat, axis=1)
+        self.sem_mean = np.sum(self.sem_mat, axis=1)/(np.shape(self.sem_mat)[1] - 1)
         
         # Cut down semantic matrix to contain only the items in the session
         self.sem_mat = self.sem_mat[self.all_nos_unique - 1, :][:, self.all_nos_unique - 1]
@@ -600,7 +601,7 @@ class CMR2(object):
         if c_similarity >= thresh:
             self.rec_items.append(1)  # YES
             if self.learn_while_retrieving:
-                self.beta = self.params['beta_rec']
+                 # self.beta = self.params['beta_rec']  # previously wrong!
                 self.present_item(cue_idx, source=None, update_context=False, update_weights=True, use_new_context=self.params['use_new_context'])
         else:
             self.rec_items.append(0)  # NO
