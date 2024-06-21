@@ -56,11 +56,11 @@ def make_boundary(sim_name):
                    )
     
     ub_dict = cmr.make_params()
-    ub_dict.update(beta_enc = 1, 
-                   beta_rec = 1,
-                   beta_cue = 1,
-                   beta_distract = 1, 
-                   beta_rec_post = 1, 
+    ub_dict.update(beta_enc = 0.5,  # 1
+                   beta_rec = 0.5,  # 1
+                   beta_cue = 0.5,  # 1
+                   beta_distract = 0.5,  # 1 
+                   beta_rec_post = 0.5,  # 1
                    phi_s = 8, 
                    phi_d = 5, 
                    s_cf = 1,

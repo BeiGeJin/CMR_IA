@@ -333,7 +333,7 @@ def obj_func_3(param_vec, df_study, df_test, sem_mat, sources):
 
     # ground truth
     I_hr_gt = np.array([0.865, 0.811, 0.752, 0.746, 0.708])
-    I_far_gt = 0.12
+    I_far_gt = 0.15 # 0.12
     A_hr_gt = np.array([0.843, 0.787, 0.720, 0.735, 0.646])
     A_far_gt = np.array([0.406, 0.371, 0.285, 0.259, 0.202])
 
