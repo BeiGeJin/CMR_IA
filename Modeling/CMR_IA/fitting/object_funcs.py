@@ -7,7 +7,6 @@ import math
 import pickle
 import scipy as sp
 from scipy.stats import norm
-from sklearn.linear_model import LinearRegression
 from optimization_utils import param_vec_to_dict
 
 def obj_func_S1(param_vec, df_study, df_test, sem_mat, sources, return_df=False):
@@ -391,44 +390,107 @@ def obj_func_1(param_vec, df_study, df_test, sem_mat, sources):
     df_simu['log_lag_bin'] = pd.cut(df_simu['log_lag'], np.arange(df_simu['log_lag'].max()+1), labels=False, right=False)
 
     # construct local FAR
-    for i in range(1, len(df_simu)):
-        if df_simu.loc[i, 'old'] == False and df_simu.loc[i-1, 'old'] == True:
-            df_simu.loc[i, 'log_lag_bin'] = df_simu.loc[i-1, 'log_lag_bin']
+    old_vec = df_simu.old.to_numpy()
+    log_lag_bin_vec = df_simu.log_lag_bin.to_numpy()
+    position_vec = df_simu.position.to_numpy()
+    max_position = np.max(position_vec)
+    log_lag_bin_newpre_lst = []
+    log_lag_bin_newpost_lst = []
+    for i in range(len(df_simu)):
+        if position_vec[i] > 0:
+            if old_vec[i] == False and old_vec[i-1] == True:
+                log_lag_bin_newpre_lst.append(log_lag_bin_vec[i-1])
+            else:
+                log_lag_bin_newpre_lst.append('N')
+        else:
+            log_lag_bin_newpre_lst.append('N')
 
+        if position_vec[i] < max_position:
+            if old_vec[i] == False and old_vec[i+1] == True:
+                log_lag_bin_newpost_lst.append(log_lag_bin_vec[i+1])
+            else:
+                log_lag_bin_newpost_lst.append('N')
+        else:
+            log_lag_bin_newpost_lst.append('N')
+    df_simu['log_lag_bin_newpre'] = log_lag_bin_newpre_lst
+    df_simu['log_lag_bin_newpost'] = log_lag_bin_newpost_lst
+    df_simu['log_lag_bin'] = df_simu.apply(lambda x: 0 if x['log_lag_bin'] == 1 else x['log_lag_bin'], axis = 1)
+    df_simu['log_lag_bin_newpre'] = df_simu.apply(lambda x: 0 if x['log_lag_bin_newpre'] == 1 else x['log_lag_bin_newpre'], axis = 1)
+    df_simu['log_lag_bin_newpost'] = df_simu.apply(lambda x: 0 if x['log_lag_bin_newpost'] == 1 else x['log_lag_bin_newpost'], axis = 1)
+    
+    # distribute items into bins
+    log_lag_bins = [0, 2, 3, 4, 5]
+    for bin in log_lag_bins:
+        col_name = "log_lag_bin_" + str(bin)
+        df_simu[col_name] = (df_simu.log_lag_bin == bin) | (df_simu.log_lag_bin_newpre == bin) | (df_simu.log_lag_bin_newpost == bin)
+    
     # get Az
-    def calculate_Az(df_tmp):
-        conf = df_tmp.csim
-        truth = df_tmp.old
-        min_conf = np.round(np.min(conf), 2)
-        max_conf = np.round(np.max(conf), 2)
-        if np.sum(truth) == 0 or np.sum(~truth) == 0:
-            return np.nan
-        if max_conf - min_conf < 0.1:
-            return np.nan
-        # calculate HR and FAR for different thresholds
-        thresholds = np.arange(min_conf+0.01, max_conf, 0.01)
-        hrs = []
-        fars = []
-        for thresh in thresholds:
-            hr = (np.sum((conf > thresh) & truth) + 0.5) / (np.sum(truth) + 1)
-            far = (np.sum((conf > thresh) & ~truth) + 0.5) / (np.sum(~truth) + 1)
-            hrs.append(hr)
-            fars.append(far)
-        # calculate z_hr and z_far
-        z_hr = norm.ppf(hrs)
-        z_far = norm.ppf(fars)
-        # linear regression on z_hr and z_far using sklearn
-        X = np.array(z_far).reshape(-1, 1)
-        y = np.array(z_hr)
-        reg = LinearRegression().fit(X, y)
-        # get slope and intercept 
-        slope = reg.coef_[0]
-        intercept = reg.intercept_
-        # get A_z
-        Az = norm.cdf(intercept/np.sqrt(1+slope**2))
-        return Az
-    df_Az = df_simu.groupby(["session", "roll_cat_len_level", "log_lag_bin"]).apply(calculate_Az).to_frame(name="Az").reset_index()
-    df_Az['log_lag_disp'] = np.ceil(np.e**df_Az.log_lag_bin)
+    def calculate_Az(df_tmp1):
+        log_lag_bins = [0, 2, 3, 4, 5]
+        Azs = []
+        for bin in log_lag_bins:
+            # get the df of this log_lag_bin
+            col_name = "log_lag_bin_" + str(bin)
+            df_tmp = df_tmp1.query(col_name + " == True").copy()
+            # get variables
+            conf = df_tmp.csim.to_numpy()
+            truth = df_tmp.old.to_numpy()
+            old_num = np.sum(truth)
+            new_num = np.sum(~truth)
+            is_old = truth
+            is_new = ~truth
+            if np.sum(truth) == 0 or np.sum(~truth) == 0:
+                Azs.append(np.nan)
+                continue
+            min_conf = np.round(np.min(conf), 2)
+            max_conf = np.round(np.max(conf), 2)
+            if max_conf - min_conf < 0.1:
+                Azs.append(np.nan)
+                continue
+            # calculate HR and FAR for different thresholds
+            step = 0.02
+            thresholds = np.arange(min_conf+step, max_conf, step)
+            hrs = []
+            fars = []
+            old_conf = conf * is_old
+            new_conf = conf * is_new
+            for thresh in thresholds:
+                hr = (np.sum(old_conf > thresh) + 0.5) / (old_num + 1)
+                far = (np.sum(new_conf > thresh) + 0.5) / (new_num + 1)
+                hrs.append(hr)
+                fars.append(far)
+            # calculate z_hr and z_far
+            z_hr = norm.ppf(hrs)
+            z_far = norm.ppf(fars)
+            # linear regression on z_hr and z_far manually
+            n = len(z_far)
+            X = np.column_stack((np.ones(n), z_far))
+            beta = np.linalg.inv(X.T @ X) @ X.T @ z_hr
+            intercept, slope = beta
+            # get A_z
+            Az = norm.cdf(intercept/np.sqrt(1+slope**2))
+            Azs.append(Az)
+        # df to return
+        df_return = pd.DataFrame({'log_lag_bin': log_lag_bins, 'Az': Azs})
+        return df_return
+    df_Az = df_simu.groupby(["session", "roll_cat_len_level"]).apply(calculate_Az).reset_index()
+    df_plot = df_Az.groupby(["roll_cat_len_level", "log_lag_bin"]).Az.mean().to_frame(name="Az").reset_index()
+    Az_lowsim = df_plot.query("roll_cat_len_level == '0-1'").Az.to_numpy()
+    Az_highsim = df_plot.query("roll_cat_len_level == '>=2'").Az.to_numpy()
+
+    # ground truth
+    Az_lowsim_gt = np.array([0.82, 0.82, 0.80, 0.73, 0.63])
+    Az_highsim_gt = np.array([0.81 , 0.78, 0.76, 0.69, 0.61])
+
+    # calculate the error
+    err = np.mean(np.power(Az_lowsim - Az_lowsim_gt, 2)) + np.mean(np.power(Az_highsim - Az_highsim_gt, 2))
+
+    cmr_stats = {}
+    cmr_stats['err'] = err
+    cmr_stats['params'] = param_vec
+    cmr_stats['stats'] = [Az_lowsim, Az_highsim]
+
+    return err, cmr_stats
 
 
 # def obj_func(param_vec, df, w2v, sources, return_recalls=False, mode='RT_score'):
