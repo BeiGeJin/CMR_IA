@@ -10,7 +10,7 @@ import pickle as pkl
 from glob import glob
 from noise_maker_pso import make_noise
 from optimization_utils import make_boundary
-from object_funcs import obj_func_S1, obj_func_S2, obj_func_6b, obj_func_3
+from object_funcs import obj_func_S1, obj_func_S2, obj_func_6b, obj_func_3, obj_func_1
 
 # Set where you want your noise files and output files to be saved
 global OUTDIR
@@ -528,6 +528,8 @@ def run_pso(df_study, df_test, sem_mat, sources, sim_name=''):
         func = obj_func_6b
     elif sim_name == '3':
         func = obj_func_3
+    elif sim_name == '1':
+        func = obj_func_1
     else:
         raise ValueError('Simulation name not recognized')
     
@@ -549,19 +551,21 @@ def run_pso(df_study, df_test, sem_mat, sources, sim_name=''):
 
 if __name__ == "__main__":
     
-    # SIM = 'David'
+    # SIM = '1'
     # SIM = 'S1'
     # SIM = 'S2'
     SIM = '3'
     # SIM = '6b'
     sem_file = '../../../Data/wordpools/ltp_FR_similarity_matrix.npy'
 
-    if SIM == 'David':
+    if SIM == '1':
         
-        with open("/home1/beigejin/Recog_David/data_als/data_df_clean.pkl", 'rb') as inp:
-            df = pkl.load(inp)
-        # df = df.loc[df.subject_ID < 10]
+        with open("../../../Analysis/simu1_recog_recsim/simu1_data/simu1_design.pkl", 'rb') as inp:
+            df_test = pkl.load(inp)
+        df_test = df_test.loc[df_test.session < 500]
+        df_study = None
         sources = None
+        sem_file = '../../../Analysis/simu1_recog_recsim/simu1_data/simu1_300_smat.npy'
     
     elif SIM == 'S1':
 
@@ -578,6 +582,7 @@ if __name__ == "__main__":
         sources = None
 
     elif SIM == '6b':
+
         with open("../../../Analysis/simu6b_cr_sym/simu6b_data/simu6b_design.pkl", 'rb') as inp:
             df_study = pkl.load(inp)
             df_test = pkl.load(inp)
@@ -586,6 +591,7 @@ if __name__ == "__main__":
         sources = None
     
     elif SIM == '3':
+        
         with open("../../../Analysis/simu3_recog_forget/simu3_data/simu3_design.pkl", 'rb') as inp:
             df_test = pkl.load(inp)
         df_test = df_test.loc[df_test.session < 300]

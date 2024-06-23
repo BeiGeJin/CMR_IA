@@ -6,6 +6,8 @@ import pandas as pd
 import math
 import pickle
 import scipy as sp
+from scipy.stats import norm
+from sklearn.linear_model import LinearRegression
 from optimization_utils import param_vec_to_dict
 
 def obj_func_S1(param_vec, df_study, df_test, sem_mat, sources, return_df=False):
@@ -357,6 +359,76 @@ def obj_func_3(param_vec, df_study, df_test, sem_mat, sources):
     cmr_stats['stats'] = [I_hr, I_far, A_hr, A_far]
 
     return err, cmr_stats
+
+def obj_func_1(param_vec, df_study, df_test, sem_mat, sources):
+
+    assert df_study == None
+    df = df_test
+
+    # Reformat parameter vector to the dictionary format expected by CMR2
+    param_dict = param_vec_to_dict(param_vec, sim_name = '1')
+    param_dict.update(use_new_context = True)
+
+    # Run model with the parameters given in param_vec
+    df_simu = cmr.run_conti_recog_multi_sess(param_dict, df, sem_mat, mode='Continuous')
+    df_simu = df_simu.merge(df,on=['session','position','study_itemno1','study_itemno2','test_itemno1','test_itemno2'])
+
+    # calculate the rolling category length
+    rolling_window = 9
+    category_label_dummies = df_simu['category_label'].str.get_dummies()
+    category_label_dummies.columns = ['cl_' + col for col in category_label_dummies.columns]
+    category_label_dummies_events = pd.concat([df_simu, category_label_dummies], axis=1) # record the occurrence of every cat label
+    cl_rolling_sum = category_label_dummies_events.groupby('session').rolling(rolling_window, min_periods=1, on='position')[category_label_dummies.columns].sum().reset_index()
+    df_rollcat = df_simu.merge(cl_rolling_sum, on=['session', 'position'])
+    df_simu['roll_cat_label_length'] = df_rollcat.apply(lambda x: x['cl_' + x['category_label']], axis = 1) # how many cat within 10 window
+    df_simu['roll_cat_label_length'] = df_simu['roll_cat_label_length'] - 1 # how many cat in previous 9 window. not include self
+    df_simu['roll_cat_len_level']= pd.cut(x=df_simu.roll_cat_label_length, 
+                                          bins=[0, 2, np.inf], right=False, include_lowest = True, 
+                                          labels=['0-1', '>=2']).astype('str')
+    
+    # add log and log lag bin
+    df_simu['log_lag'] = np.log(df_simu['lag'])
+    df_simu['log_lag_bin'] = pd.cut(df_simu['log_lag'], np.arange(df_simu['log_lag'].max()+1), labels=False, right=False)
+
+    # construct local FAR
+    for i in range(1, len(df_simu)):
+        if df_simu.loc[i, 'old'] == False and df_simu.loc[i-1, 'old'] == True:
+            df_simu.loc[i, 'log_lag_bin'] = df_simu.loc[i-1, 'log_lag_bin']
+
+    # get Az
+    def calculate_Az(df_tmp):
+        conf = df_tmp.csim
+        truth = df_tmp.old
+        min_conf = np.round(np.min(conf), 2)
+        max_conf = np.round(np.max(conf), 2)
+        if np.sum(truth) == 0 or np.sum(~truth) == 0:
+            return np.nan
+        if max_conf - min_conf < 0.1:
+            return np.nan
+        # calculate HR and FAR for different thresholds
+        thresholds = np.arange(min_conf+0.01, max_conf, 0.01)
+        hrs = []
+        fars = []
+        for thresh in thresholds:
+            hr = (np.sum((conf > thresh) & truth) + 0.5) / (np.sum(truth) + 1)
+            far = (np.sum((conf > thresh) & ~truth) + 0.5) / (np.sum(~truth) + 1)
+            hrs.append(hr)
+            fars.append(far)
+        # calculate z_hr and z_far
+        z_hr = norm.ppf(hrs)
+        z_far = norm.ppf(fars)
+        # linear regression on z_hr and z_far using sklearn
+        X = np.array(z_far).reshape(-1, 1)
+        y = np.array(z_hr)
+        reg = LinearRegression().fit(X, y)
+        # get slope and intercept 
+        slope = reg.coef_[0]
+        intercept = reg.intercept_
+        # get A_z
+        Az = norm.cdf(intercept/np.sqrt(1+slope**2))
+        return Az
+    df_Az = df_simu.groupby(["session", "roll_cat_len_level", "log_lag_bin"]).apply(calculate_Az).to_frame(name="Az").reset_index()
+    df_Az['log_lag_disp'] = np.ceil(np.e**df_Az.log_lag_bin)
 
 
 # def obj_func(param_vec, df, w2v, sources, return_recalls=False, mode='RT_score'):
