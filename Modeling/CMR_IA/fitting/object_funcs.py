@@ -463,13 +463,16 @@ def obj_func_1(param_vec, df_study, df_test, sem_mat, sources):
             z_hr = norm.ppf(hrs)
             z_far = norm.ppf(fars)
             # linear regression on z_hr and z_far manually
-            n = len(z_far)
-            X = np.column_stack((np.ones(n), z_far))
-            beta = np.linalg.inv(X.T @ X) @ X.T @ z_hr
-            intercept, slope = beta
-            # get A_z
-            Az = norm.cdf(intercept/np.sqrt(1+slope**2))
-            Azs.append(Az)
+            try:
+                n = len(z_far)
+                X = np.column_stack((np.ones(n), z_far))
+                beta = np.linalg.inv(X.T @ X) @ X.T @ z_hr
+                intercept, slope = beta
+                # get A_z
+                Az = norm.cdf(intercept/np.sqrt(1+slope**2))
+                Azs.append(Az)
+            except:
+                Azs.append(np.nan)
         # df to return
         df_return = pd.DataFrame({'log_lag_bin': log_lag_bins, 'Az': Azs})
         return df_return
