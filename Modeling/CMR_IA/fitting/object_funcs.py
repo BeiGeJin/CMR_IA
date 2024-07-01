@@ -483,10 +483,12 @@ def obj_func_1(param_vec, df_study, df_test, sem_mat, sources):
 
     # ground truth
     Az_lowsim_gt = np.array([0.82, 0.82, 0.80, 0.73, 0.63])
-    Az_highsim_gt = np.array([0.81 , 0.78, 0.76, 0.69, 0.61])
+    Az_highsim_gt = np.array([0.81, 0.78, 0.76, 0.69, 0.61])
 
     # calculate the error
     err = np.mean(np.power(Az_lowsim - Az_lowsim_gt, 2)) + np.mean(np.power(Az_highsim - Az_highsim_gt, 2))
+    if np.isnan(err):
+        err = 10
 
     cmr_stats = {}
     cmr_stats['err'] = err
