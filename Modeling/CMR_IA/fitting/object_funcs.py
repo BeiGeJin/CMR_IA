@@ -424,6 +424,112 @@ def obj_func_1(param_vec, df_study, df_test, sem_mat, sources):
         col_name = "log_lag_bin_" + str(bin)
         df_simu[col_name] = (df_simu.log_lag_bin == bin) | (df_simu.log_lag_bin_newpre == bin) | (df_simu.log_lag_bin_newpost == bin)
     
+    # group by rollcat and lagbin
+    df_lst = []
+    for bin in log_lag_bins:
+        col_name = "log_lag_bin_" + str(bin)
+        df_tmp = df_simu.query(col_name + " == True").groupby(["session", "old", "roll_cat_len_level"])['s_resp'].mean().to_frame(name='yes_rate').reset_index()
+        df_tmp["log_lag_bin"] = bin
+        df_lst.append(df_tmp)
+    df_rollcat_laggp = pd.concat(df_lst)
+ 
+    # pivot for hr and far
+    df_rollcat_laggp['old'] = df_rollcat_laggp['old'].astype('str')
+    df_dprime = pd.pivot_table(df_rollcat_laggp, values='yes_rate', index=['session', 'roll_cat_len_level', 'log_lag_bin'], columns='old').reset_index()
+    df_dprime = df_dprime.rename(columns={'False': 'far', 'True': 'hr'})
+
+    # get hr and far
+    df_hrfar = df_dprime.groupby(['roll_cat_len_level', 'log_lag_bin'])[['hr', 'far']].mean().reset_index()
+    hr_lowsim = df_hrfar.query('roll_cat_len_level == "0-1"').hr.to_numpy()
+    hr_highsim = df_hrfar.query('roll_cat_len_level == ">=2"').hr.to_numpy()
+    far_lowsim = df_hrfar.query('roll_cat_len_level == "0-1"').far.to_numpy()
+    far_highsim = df_hrfar.query('roll_cat_len_level == ">=2"').far.to_numpy()
+
+    # ground truth
+    hr_lowsim_gt = np.array([0.885, 0.853, 0.787, 0.682, 0.630])
+    hr_highsim_gt = np.array([0.893, 0.858, 0.795, 0.720, 0.671])
+    far_lowsim_gt = np.array([0.190, 0.190, 0.190, 0.195, 0.212])
+    far_highsim_gt = np.array([0.202, 0.210, 0.216, 0.229, 0.237]) # a bit diff from real gt
+
+    # calculate the error
+    err = np.mean(np.power(hr_lowsim - hr_lowsim_gt, 2)) + np.mean(np.power(hr_highsim - hr_highsim_gt, 2)) \
+        + np.mean(np.power(far_lowsim - far_lowsim_gt, 2)) + np.mean(np.power(far_highsim - far_highsim_gt, 2))
+    if np.isnan(err):
+        err = 10
+
+    cmr_stats = {}
+    cmr_stats['err'] = err
+    cmr_stats['params'] = param_vec
+    cmr_stats['stats'] = [hr_lowsim, hr_highsim, far_lowsim, far_highsim]
+
+    return err, cmr_stats
+
+
+def obj_func_1_Az(param_vec, df_study, df_test, sem_mat, sources):
+
+    assert df_study == None
+    df = df_test
+
+    # Reformat parameter vector to the dictionary format expected by CMR2
+    param_dict = param_vec_to_dict(param_vec, sim_name = '1')
+    param_dict.update(use_new_context = True)
+
+    # Run model with the parameters given in param_vec
+    df_simu = cmr.run_conti_recog_multi_sess(param_dict, df, sem_mat, mode='Continuous')
+    df_simu = df_simu.merge(df,on=['session','position','study_itemno1','study_itemno2','test_itemno1','test_itemno2'])
+
+    # calculate the rolling category length
+    rolling_window = 9
+    category_label_dummies = df_simu['category_label'].str.get_dummies()
+    category_label_dummies.columns = ['cl_' + col for col in category_label_dummies.columns]
+    category_label_dummies_events = pd.concat([df_simu, category_label_dummies], axis=1) # record the occurrence of every cat label
+    cl_rolling_sum = category_label_dummies_events.groupby('session').rolling(rolling_window, min_periods=1, on='position')[category_label_dummies.columns].sum().reset_index()
+    df_rollcat = df_simu.merge(cl_rolling_sum, on=['session', 'position'])
+    df_simu['roll_cat_label_length'] = df_rollcat.apply(lambda x: x['cl_' + x['category_label']], axis = 1) # how many cat within 10 window
+    df_simu['roll_cat_label_length'] = df_simu['roll_cat_label_length'] - 1 # how many cat in previous 9 window. not include self
+    df_simu['roll_cat_len_level']= pd.cut(x=df_simu.roll_cat_label_length, 
+                                          bins=[0, 2, np.inf], right=False, include_lowest = True, 
+                                          labels=['0-1', '>=2']).astype('str')
+    
+    # add log and log lag bin
+    df_simu['log_lag'] = np.log(df_simu['lag'])
+    df_simu['log_lag_bin'] = pd.cut(df_simu['log_lag'], np.arange(df_simu['log_lag'].max()+1), labels=False, right=False)
+
+    # construct local FAR
+    old_vec = df_simu.old.to_numpy()
+    log_lag_bin_vec = df_simu.log_lag_bin.to_numpy()
+    position_vec = df_simu.position.to_numpy()
+    max_position = np.max(position_vec)
+    log_lag_bin_newpre_lst = []
+    log_lag_bin_newpost_lst = []
+    for i in range(len(df_simu)):
+        if position_vec[i] > 0:
+            if old_vec[i] == False and old_vec[i-1] == True:
+                log_lag_bin_newpre_lst.append(log_lag_bin_vec[i-1])
+            else:
+                log_lag_bin_newpre_lst.append('N')
+        else:
+            log_lag_bin_newpre_lst.append('N')
+
+        if position_vec[i] < max_position:
+            if old_vec[i] == False and old_vec[i+1] == True:
+                log_lag_bin_newpost_lst.append(log_lag_bin_vec[i+1])
+            else:
+                log_lag_bin_newpost_lst.append('N')
+        else:
+            log_lag_bin_newpost_lst.append('N')
+    df_simu['log_lag_bin_newpre'] = log_lag_bin_newpre_lst
+    df_simu['log_lag_bin_newpost'] = log_lag_bin_newpost_lst
+    df_simu['log_lag_bin'] = df_simu.apply(lambda x: 0 if x['log_lag_bin'] == 1 else x['log_lag_bin'], axis = 1)
+    df_simu['log_lag_bin_newpre'] = df_simu.apply(lambda x: 0 if x['log_lag_bin_newpre'] == 1 else x['log_lag_bin_newpre'], axis = 1)
+    df_simu['log_lag_bin_newpost'] = df_simu.apply(lambda x: 0 if x['log_lag_bin_newpost'] == 1 else x['log_lag_bin_newpost'], axis = 1)
+    
+    # distribute items into bins
+    log_lag_bins = [0, 2, 3, 4, 5]
+    for bin in log_lag_bins:
+        col_name = "log_lag_bin_" + str(bin)
+        df_simu[col_name] = (df_simu.log_lag_bin == bin) | (df_simu.log_lag_bin_newpre == bin) | (df_simu.log_lag_bin_newpost == bin)
+    
     # get Az
     def calculate_Az(df_tmp1):
         log_lag_bins = [0, 2, 3, 4, 5]

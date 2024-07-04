@@ -178,7 +178,8 @@ def make_boundary(sim_name):
     #                )
    # Which Parameters to fit
     if sim_name == '1':
-        what_to_fit = ['beta_enc','beta_rec_post','s_fc','gamma_fc']
+        # what_to_fit = ['beta_enc','beta_rec_post','s_fc','gamma_fc']
+        what_to_fit = ['beta_enc','beta_rec_post','s_fc','gamma_fc', 'c_thresh_itm']
     elif sim_name == 'S1':
         what_to_fit = ['beta_enc', 'beta_rec', 'beta_cue', 'beta_rec_post', 'beta_distract', 'gamma_fc', 'gamma_cf', 's_fc', 's_cf', 'phi_s', 'phi_d', 'kappa', 'lamb', 'eta', 'omega', 'alpha', 'c_thresh', 'c_thresh_itm', 'c_thresh_ass', 'd_ass']
     elif sim_name == 'S2':
