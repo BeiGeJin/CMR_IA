@@ -56,11 +56,11 @@ def make_boundary(sim_name):
                    )
     
     ub_dict = cmr.make_params()
-    ub_dict.update(beta_enc = 0.5,  # 1
-                   beta_rec = 0.5,  # 1
-                   beta_cue = 0.5,  # 1
-                   beta_distract = 0.5,  # 1 
-                   beta_rec_post = 0.5,  # 1
+    ub_dict.update(beta_enc = 1,
+                   beta_rec = 1,
+                   beta_cue = 1,
+                   beta_distract = 1,
+                   beta_rec_post = 1,
                    phi_s = 8, 
                    phi_d = 5, 
                    s_cf = 1,
@@ -180,6 +180,12 @@ def make_boundary(sim_name):
     if sim_name == '1':
         # what_to_fit = ['beta_enc','beta_rec_post','s_fc','gamma_fc']
         what_to_fit = ['beta_enc','beta_rec_post','s_fc','gamma_fc', 'c_thresh_itm']
+        # simulation specific boundary
+        lb_dict.update(c_thresh_itm = 0.2)
+        ub_dict.update(beta_enc = 0.4,
+                       beta_rec_post = 0.4,
+                       s_cf = 0.5,
+                       c_thresh_itm = 0.8)
     elif sim_name == 'S1':
         what_to_fit = ['beta_enc', 'beta_rec', 'beta_cue', 'beta_rec_post', 'beta_distract', 'gamma_fc', 'gamma_cf', 's_fc', 's_cf', 'phi_s', 'phi_d', 'kappa', 'lamb', 'eta', 'omega', 'alpha', 'c_thresh', 'c_thresh_itm', 'c_thresh_ass', 'd_ass']
     elif sim_name == 'S2':
