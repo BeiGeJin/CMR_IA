@@ -452,8 +452,11 @@ def obj_func_1(param_vec, df_study, df_test, sem_mat, sources):
     far_highsim_gt = np.array([0.202, 0.210, 0.216, 0.229, 0.237]) # a bit diff from real gt
 
     # calculate the error
-    err = np.mean(np.power(hr_lowsim - hr_lowsim_gt, 2)) + np.mean(np.power(hr_highsim - hr_highsim_gt, 2)) \
+    pow_err = np.mean(np.power(hr_lowsim - hr_lowsim_gt, 2)) + np.mean(np.power(hr_highsim - hr_highsim_gt, 2)) \
         + np.mean(np.power(far_lowsim - far_lowsim_gt, 2)) + np.mean(np.power(far_highsim - far_highsim_gt, 2))
+    abs_err = np.mean(np.abs(hr_lowsim - hr_lowsim_gt)) + np.mean(np.abs(hr_highsim - hr_highsim_gt)) \
+        + np.mean(np.abs(far_lowsim - far_lowsim_gt)) + np.mean(np.abs(far_highsim - far_highsim_gt))
+    err = pow_err + abs_err / 10
     if np.isnan(err):
         err = 10
 
