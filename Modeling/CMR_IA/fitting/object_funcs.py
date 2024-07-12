@@ -339,8 +339,11 @@ def obj_func_3(param_vec, df_study, df_test, sem_mat, sources):
     A_far_gt = np.array([0.406, 0.371, 0.285, 0.259, 0.202])
 
     # calculate the error
-    err = np.mean(np.power(I_hr - I_hr_gt, 2)) + np.mean(np.power(A_hr - A_hr_gt, 2)) \
+    pow_err = np.mean(np.power(I_hr - I_hr_gt, 2)) + np.mean(np.power(A_hr - A_hr_gt, 2)) \
         + np.power(I_far - I_far_gt, 2) * 5 + np.mean(np.power(A_far - A_far_gt, 2))
+    abs_err = np.mean(np.abs(I_hr - I_hr_gt)) + np.mean(np.abs(A_hr - A_hr_gt)) \
+        + np.abs(I_far - I_far_gt) * 5 + np.mean(np.abs(A_far - A_far_gt))
+    err = pow_err + abs_err / 10
     
     # apply some constraints
     if not (I_hr[0] > I_hr[1] and I_hr[1] > I_hr[2] and I_hr[2] > I_hr[3] and I_hr[3] > I_hr[4]):
