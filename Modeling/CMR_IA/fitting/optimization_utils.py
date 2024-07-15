@@ -79,55 +79,6 @@ def make_boundary(sim_name):
                    thresh_sigma = 0.5,
                    )
     
-    # exp2 improved boundaries
-    # lb_dict = cmr.make_params()
-    # lb_dict.update(beta_enc = 0.2, 
-    #                beta_rec = 0.4, 
-    #                beta_cue = 0,
-    #                beta_distract = 0,
-    #                beta_rec_post = 0.4, 
-    #                phi_s = 0, 
-    #                phi_d = 0, 
-    #                s_cf = 0,
-    #                s_fc = 0.2,
-    #                kappa = 0, 
-    #                eta = 0, 
-    #                omega = 1, 
-    #                alpha = 0.5, 
-    #                c_thresh = 0,
-    #                c_thresh_itm = 0.6, 
-    #                c_thresh_ass = 0.6,
-    #                lamb = 0,
-    #                gamma_fc = 0, 
-    #                gamma_cf = 0,
-    #                d_ass = 0.6,
-    #                thresh_sigma = 0,
-    #                )
-    
-    # ub_dict = cmr.make_params()
-    # ub_dict.update(beta_enc = 0.8, 
-    #                beta_rec = 0.8,
-    #                beta_cue = 0.5,
-    #                beta_distract = 0.6, 
-    #                beta_rec_post = 1, 
-    #                phi_s = 8, 
-    #                phi_d = 5, 
-    #                s_cf = 1,
-    #                s_fc = 0.8,
-    #                kappa = 0.5, 
-    #                eta = 0.25, 
-    #                omega = 10, 
-    #                alpha = 1, 
-    #                c_thresh = 1,
-    #                c_thresh_itm = 1,
-    #                c_thresh_ass = 1, 
-    #                lamb = 0.25,
-    #                gamma_fc = 0.4, 
-    #                gamma_cf = 1,
-    #                d_ass = 1,
-    #                thresh_sigma = 0.2,
-    #                )
-
     # exp1 improved boundaries
     # lb_dict = cmr.make_params()
     # lb_dict.update(beta_enc = 0.2, 
@@ -176,6 +127,7 @@ def make_boundary(sim_name):
     #                d_ass = 1,
     #                thresh_sigma = 1,
     #                )
+
    # Which Parameters to fit
     if sim_name == '1':
         # what_to_fit = ['beta_enc','beta_rec_post','s_fc','gamma_fc']
@@ -187,20 +139,45 @@ def make_boundary(sim_name):
                        s_fc = 0.4,
                        gamma_fc = 0.4,
                        c_thresh_itm = 0.8)
+    
     elif sim_name == '3':
         what_to_fit = ['beta_enc','beta_cue','beta_rec_post','s_fc','gamma_fc', 'c_thresh_itm', 'c_thresh_ass']
         # simulation specific boundary
         ub_dict.update(beta_enc = 0.5,
                        beta_cue = 0.5,
                        beta_rec_post = 0.5)
+    
     elif sim_name == 'S1':
         what_to_fit = ['beta_enc', 'beta_rec', 'beta_cue', 'beta_rec_post', 'beta_distract', 'gamma_fc', 'gamma_cf', 's_fc', 's_cf', 'phi_s', 'phi_d', 'kappa', 'lamb', 'eta', 'omega', 'alpha', 'c_thresh', 'c_thresh_itm', 'c_thresh_ass', 'd_ass']
+    
     elif sim_name == 'S2':
-        what_to_fit = ['beta_enc', 'beta_rec', 'beta_cue', 'beta_rec_post', 'beta_distract', 'gamma_fc', 's_fc', 'c_thresh_itm', 'c_thresh_ass', 'd_ass', 'thresh_sigma']
+        # what_to_fit = ['beta_enc', 'beta_rec', 'beta_cue', 'beta_rec_post', 'beta_distract', 'gamma_fc', 's_fc', 'c_thresh_itm', 'c_thresh_ass', 'd_ass', 'thresh_sigma']
+        what_to_fit = ['beta_enc', 'beta_cue', 'beta_rec_post', 'beta_distract', 'gamma_fc', 's_fc', 'c_thresh_itm', 'c_thresh_ass', 'thresh_sigma']
+        # simulation specific boundary
+        lb_dict.update(beta_enc = 0,
+                       beta_cue = 0,
+                       beta_rec_post = 0.4,
+                       beta_distract = 0,
+                       gamma_fc = 0,
+                       s_fc = 0.2,
+                       c_thresh_itm = 0.6,
+                       c_thresh_ass = 0.6,
+                       thresh_sigma = 0)
+        ub_dict.update(beta_enc = 0.8,
+                       beta_cue = 0.5,
+                       beta_rec_post = 1,
+                       beta_distract = 0.6,
+                       gamma_fc = 0.4,
+                       s_fc = 0.8,
+                       c_thresh_itm = 1,
+                       c_thresh_ass = 1,
+                       thresh_sigma = 0.2)
+
     elif sim_name == '6b':
         what_to_fit = ['beta_enc', 'beta_rec', 'beta_cue', 'beta_rec_post', 'beta_distract', 'gamma_fc', 'gamma_cf', 's_fc', 's_cf', 'phi_s', 'phi_d', 'kappa', 'lamb', 'eta', 'omega', 'alpha', 'c_thresh']
         # what_to_fit = ['beta_enc', 'beta_rec', 'beta_cue', 'beta_rec_post', 'beta_distract', 'gamma_fc', 'gamma_cf', 's_fc', 's_cf', 'phi_s', 'phi_d', 'kappa', 'lamb', 'eta', 'omega', 'alpha', 'c_thresh', 'd_ass']
 
+    # create lb and ub as list
     lb = [lb_dict[key] for key in what_to_fit]
     ub = [ub_dict[key] for key in what_to_fit]
 

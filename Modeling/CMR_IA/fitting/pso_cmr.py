@@ -504,8 +504,8 @@ def run_pso(df_study, df_test, sem_mat, sources, sim_name=''):
 
     # Set PSO parameters
     alg = 'pso2'
-    swarmsize = 100
-    n_iter = 100
+    swarmsize = 200
+    n_iter = 200
     omega_min = .72984 if alg in ('pso2', 'awl') else .3 if alg == 'apso6' else .4
     omega_max = .72984 if alg in ('pso2', 'awl') else .9
     d_omega = .1  # Delta omega for apso6 algorithm
@@ -553,8 +553,8 @@ if __name__ == "__main__":
     
     # SIM = '1'
     # SIM = 'S1'
-    # SIM = 'S2'
-    SIM = '3'
+    SIM = 'S2'
+    # SIM = '3'
     # SIM = '6b'
     sem_file = '../../../Data/wordpools/ltp_FR_similarity_matrix.npy'
 

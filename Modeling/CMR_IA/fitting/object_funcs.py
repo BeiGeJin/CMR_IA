@@ -107,7 +107,7 @@ def obj_func_S2(param_vec, df_study, df_test, sem_mat, sources):
     param_dict = param_vec_to_dict(param_vec, sim_name = 'S2')
     
     # Run model with the parameters given in param_vec
-    param_dict.update(learn_while_retrieving=True)
+    param_dict.update(learn_while_retrieving=True, use_new_context = True)
     df_simu, _, _ = cmr.run_success_multi_sess(param_dict, df_study, df_test, sem_mat, mode="Recog-Recog")
     df_simu['test'] = df_test['test']
     df_simu = df_simu.merge(df_test,on=['session','list','test','test_itemno1','test_itemno2'])
