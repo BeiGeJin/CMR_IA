@@ -31,7 +31,7 @@ def obj_func_S1(param_vec, df_study, df_test, sem_mat, sources, return_df=False)
             test1_num = 80
 
         # Run model with the parameters given in param_vec
-        param_dict.update(nitems_in_accumulator = nitems, learn_while_retrieving = True, rec_time_limit=10000)
+        param_dict.update(nitems_in_accumulator = nitems, learn_while_retrieving = True, rec_time_limit=10000, use_new_context = True)
         df_simu, _, _ = cmr.run_success_multi_sess(param_dict, df_study_gp, df_test_gp, sem_mat)
         # print(df_simu)
         # print(df_test_gp)

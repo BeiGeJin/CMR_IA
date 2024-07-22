@@ -552,8 +552,8 @@ def run_pso(df_study, df_test, sem_mat, sources, sim_name=''):
 if __name__ == "__main__":
     
     # SIM = '1'
-    # SIM = 'S1'
-    SIM = 'S2'
+    SIM = 'S1'
+    # SIM = 'S2'
     # SIM = '3'
     # SIM = '6b'
     sem_file = '../../../Data/wordpools/ltp_FR_similarity_matrix.npy'
