@@ -78,55 +78,6 @@ def make_boundary(sim_name):
                    d_ass = 1,
                    thresh_sigma = 0.5,
                    )
-    
-    # exp1 improved boundaries
-    # lb_dict = cmr.make_params()
-    # lb_dict.update(beta_enc = 0.2, 
-    #                beta_rec = 0, 
-    #                beta_cue = 0.4,
-    #                beta_distract = 0.4,
-    #                beta_rec_post = 0.4, 
-    #                phi_s = 2, 
-    #                phi_d = 2, 
-    #                s_cf = 0,
-    #                s_fc = 0,
-    #                kappa = 0, 
-    #                eta = 0, 
-    #                omega = 5, 
-    #                alpha = 0.5, 
-    #                c_thresh = 0.2,
-    #                c_thresh_itm = 0.2, 
-    #                c_thresh_ass = 0.4,
-    #                lamb = 0,
-    #                gamma_fc = 0, 
-    #                gamma_cf = 0.6,
-    #                d_ass = 0.6,
-    #                thresh_sigma = 0,
-    #                )
-    
-    # ub_dict = cmr.make_params()
-    # ub_dict.update(beta_enc = 0.8, 
-    #                beta_rec = 0.6,
-    #                beta_cue = 1,
-    #                beta_distract = 1, 
-    #                beta_rec_post = 1, 
-    #                phi_s = 5, 
-    #                phi_d = 5, 
-    #                s_cf = 1,
-    #                s_fc = 0.4,
-    #                kappa = 0.5, 
-    #                eta = 0.25, 
-    #                omega = 10, 
-    #                alpha = 1, 
-    #                c_thresh = 0.8,
-    #                c_thresh_itm = 0.6,
-    #                c_thresh_ass = 0.8, 
-    #                lamb = 0.2,
-    #                gamma_fc = 0.4, 
-    #                gamma_cf = 1,
-    #                d_ass = 1,
-    #                thresh_sigma = 1,
-    #                )
 
    # Which Parameters to fit
     if sim_name == '1':

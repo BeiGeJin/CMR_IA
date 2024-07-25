@@ -55,8 +55,8 @@ for i in `seq 1 $PROCS`; do
 	#$2 1>/dev/null 2>/dev/null &
 	# echo qsub -l h_vmem=2G -cwd -N $PNAME -v PYFILE=$PYFILE $SH_SCRIPT; 
 	# qsub -l h_vmem=2G -N $PNAME -v PYFILE=$PYFILE $SH_SCRIPT;
-    echo sbatch -p RAM -t 7-00:00 -c 1 --mem=5G -w node23 -J $PNAME $SH_SCRIPT
-    sbatch -p RAM -t 7-00:00 -c 1 --mem=5G -w node23 -J $PNAME $SH_SCRIPT
+    echo sbatch -p RAM -t 7-00:00 -c 1 --mem=5G -w node21 -J $PNAME $SH_SCRIPT
+    sbatch -p RAM -t 7-00:00 -c 1 --mem=5G -w node21 -J $PNAME $SH_SCRIPT
 	sleep 2;
 done
 
