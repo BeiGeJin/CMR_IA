@@ -20,17 +20,18 @@ def obj_func_S1(param_vec, df_study, df_test, sem_mat, sources, return_df=False)
         df_study_gp = df_study.query(f"group == {i}").copy()
         df_test_gp = df_test.query(f"group == {i}").copy()
 
-        if i == 1:  # asso-CR
-            nitems = 4 * 48 # 96
-            test1_num = 40
-        elif i == 2:  # pair-CR
-            nitems = 4 * 48 # 176
-            test1_num = 80
-        elif i == 3:  # item-CR
-            nitems = 4 * 48 # 136
-            test1_num = 80
+        # if i == 1:  # item-CR
+        #     nitems = 4 * 48 # 136
+        #     test1_num = 80
+        # elif i == 2:  # pair-CR
+        #     nitems = 4 * 48 # 176
+        #     test1_num = 80
+        # elif i == 3:  # assoc-CR
+        #     nitems = 4 * 48 # 96
+        #     test1_num = 40
 
         # Run model with the parameters given in param_vec
+        nitems = 4 * 48
         param_dict.update(nitems_in_accumulator = nitems, learn_while_retrieving = True, rec_time_limit=10000, use_new_context = True)
         df_simu, _, _ = cmr.run_success_multi_sess(param_dict, df_study_gp, df_test_gp, sem_mat)
         # print(df_simu)
@@ -49,7 +50,9 @@ def obj_func_S1(param_vec, df_study, df_test, sem_mat, sources, return_df=False)
     
     # Score the model's behavioral stats as compared with the true data    
     stats = np.array(stats)
-    ground_truth = np.array([[0.42, 0.72, 0.22, 0.81], [0.30, 0.80, 0.12, 0.71], [0.19, 0.67, 0.15, 0.57]])  # p_rc, hr, far, q
+    ground_truth = np.array([[0.19, 0.67, 0.15, 0.57],
+                             [0.30, 0.80, 0.12, 0.71],
+                             [0.42, 0.72, 0.22, 0.81]])  # p_rc, hr, far, q
     err = np.mean(np.power(stats - ground_truth,2))
     
     cmr_stats = {}
@@ -66,40 +69,37 @@ def obj_func_S1(param_vec, df_study, df_test, sem_mat, sources, return_df=False)
 def anal_perform_S1(df_simu):
 
     # Get correctness
-    df_simu['correct'] = df_simu.s_resp == df_simu.correct_ans
+    df_simu["correct"] = df_simu.s_resp == df_simu.correct_ans
 
     # Recognition performance
     df_recog = df_simu.query("test==1")
-    hr_far = df_recog.groupby("correct_ans")["s_resp"].mean().to_frame(name="Yes rate")
-    hr = hr_far['Yes rate'][1]
-    far = hr_far['Yes rate'][0]
-    # print("recognition: \n", hr_far)
+    recog_resp = df_recog["s_resp"].to_numpy()
+    is_old = df_recog["correct_ans"].to_numpy()
+    is_new = 1 - is_old
+    old_num = np.sum(is_old)
+    new_num = np.sum(is_new)
+    hr = np.sum(recog_resp * is_old) / old_num
+    far = np.sum(recog_resp * is_new) / new_num
 
     # Cued recall performance
     df_cr = df_simu.query("test==2")
-    p_rc = df_cr.correct.mean()
-    # print("cued recall: \n", p_rc)
+    cr_resp = df_cr["s_resp"].to_numpy()
+    cr_truth = df_cr["correct_ans"].to_numpy()
+    p_rc = np.mean(cr_resp == cr_truth)
 
-    # Analyze pair
-    def get_pair(df_tmp):
-        df_tmp_pair = pd.pivot_table(df_tmp,index="pair_idx",columns="test",values="correct")
-        df_tmp_pair.columns = ["test1","test2"]
-        df_tmp_pair.reset_index(inplace=True)
-        return df_tmp_pair
-    df_simu_p = df_simu.query("pair_idx >= 0")
-    df_pair = df_simu_p.groupby("session").apply(get_pair).reset_index()
-    test2_rsp = pd.Categorical(df_pair.test2, categories=[0,1])
-    test1_rsp = pd.Categorical(df_pair.test1, categories=[0,1])
-    df_tab = pd.crosstab(index=test2_rsp,columns=test1_rsp, rownames=['test2'], colnames=['test1'], normalize=False, dropna=False)
-    # print("contingency table: \n", df_tab)
-
-    # Compute Q values
-    def Yule_Q(A, B, C, D):
-        return (A * D - B * C) / (A * D + B * C)
-    q = Yule_Q(df_tab[1][1]+0.5,df_tab[0][1]+0.5,df_tab[1][0]+0.5,df_tab[0][0]+0.5)  # add 0.5
-    # print("Q: ", q)
+    # successive test performance and calculate Q
+    df_simu_study = df_simu.query("pair_idx >= 0")
+    df_pair = pd.pivot_table(df_simu_study, index="pair_idx", columns="test", values="correct")
+    test1_resp = df_pair[1].to_numpy(dtype=int)
+    test2_resp = df_pair[2].to_numpy(dtype=int)
+    A = np.sum((test1_resp == 1) & (test2_resp == 1)) + 0.5
+    B = np.sum((test1_resp == 0) & (test2_resp == 1)) + 0.5
+    C = np.sum((test1_resp == 1) & (test2_resp == 0)) + 0.5
+    D = np.sum((test1_resp == 0) & (test2_resp == 0)) + 0.5
+    q = (A * D - B * C) / (A * D + B * C)
 
     return p_rc, hr, far, q
+
 
 def obj_func_S2(param_vec, df_study, df_test, sem_mat, sources):
 
