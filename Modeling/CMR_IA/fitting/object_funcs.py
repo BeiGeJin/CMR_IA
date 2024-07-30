@@ -55,6 +55,10 @@ def obj_func_S1(param_vec, df_study, df_test, sem_mat, sources, return_df=False)
                              [0.42, 0.72, 0.22, 0.81]])  # p_rc, hr, far, q
     err = np.mean(np.power(stats - ground_truth,2))
     
+    # apply some constraints that pair FAR should not be 0
+    if stats[1,2] == 0:
+        err += 1
+    
     cmr_stats = {}
     cmr_stats['err'] = err
     cmr_stats['params'] = param_vec
